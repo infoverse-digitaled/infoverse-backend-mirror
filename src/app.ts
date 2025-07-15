@@ -1,11 +1,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 
 import errorHandler from './middleware/errorHandler';
-import logger from './middleware/logger';
+import setupMiddleware from './middleware/index';
 import setRoutes from './routes/setRoutes';
 import authRoutes from './routes/auth';
 
@@ -25,20 +24,9 @@ mongoose
     console.error('MongoDB connection error:', err);
   });
 
-// Middleware
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-  }),
-);
-app.use(express.json());
-app.use(logger);
-
+setupMiddleware(app);
 // Auth routes
 app.use('/api/auth', authRoutes);
-
-// Application routes
 setRoutes(app);
 
 // Health check
@@ -49,7 +37,6 @@ app.get('/health', (_req: Request, res: Response) => {
 // Global error handler
 app.use(errorHandler);
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
