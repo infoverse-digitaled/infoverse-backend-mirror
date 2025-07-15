@@ -1,8 +1,18 @@
-import { Express } from 'express';
+import { Router } from 'express';
 import { helloController } from '../controllers';
+import { authenticateJWT } from '../middleware/authMiddleware';
 
-const setRoutes = (app: Express) => {
-  app.get('/', helloController);
-};
+const router = Router();
 
-export default setRoutes;
+// Public route
+router.get('/', helloController);
+
+// Protected route
+router.get('/profile', authenticateJWT, (req, res) => {
+  res.json({
+    message: 'You are authorized!',
+    user: (req as any).user,
+  });
+});
+
+export default router;

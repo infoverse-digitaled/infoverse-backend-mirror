@@ -2,8 +2,11 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
-import setRoutes from './routes';
-import setupMiddleware from './middleware';
+
+import errorHandler from './middleware/errorHandler';
+import setupMiddleware from './middleware/index';
+import setRoutes from './routes/setRoutes';
+import authRoutes from './routes/auth';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -20,12 +23,17 @@ mongoose
     console.error('MongoDB connection error:', err);
   });
 
-setRoutes(app);
 setupMiddleware(app);
+// Auth routes
+app.use('/api/auth', authRoutes);
+setRoutes(app);
 
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
+
+// Global error handler
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
