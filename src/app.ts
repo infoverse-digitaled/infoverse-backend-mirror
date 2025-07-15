@@ -13,6 +13,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// MongoDB connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/infoverseDB';
 mongoose
   .connect(MONGO_URI)
@@ -28,7 +29,8 @@ setupMiddleware(app);
 app.use('/api/auth', authRoutes);
 setRoutes(app);
 
-app.get('/health', (req: Request, res: Response) => {
+// Health check
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
 
