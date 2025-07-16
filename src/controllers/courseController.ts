@@ -24,7 +24,7 @@ const findCourseById = async (id: string) => {
   return await Course.findById(id);
 };
 
-//Extend req typing for authenticated routes
+// Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -33,7 +33,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-//Controllers
+// Controllers
 export const listCourses = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;

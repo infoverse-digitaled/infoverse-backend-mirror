@@ -7,7 +7,10 @@ const validateRequest = (req: Request, res: Response, next: NextFunction) => {
     return res.status(400).json({
       error: {
         code: 'VALIDATION_ERROR',
-        message: errors.array().map(err => err.msg).join(', '),
+        message: errors
+          .array()
+          .map((err) => err.msg)
+          .join(', '),
       },
     });
   }

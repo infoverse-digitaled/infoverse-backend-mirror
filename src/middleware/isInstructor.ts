@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from '../utils/httpError';
 
-//Extend Request inline
+// Extend Request inline
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;

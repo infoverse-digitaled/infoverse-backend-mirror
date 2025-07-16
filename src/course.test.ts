@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from './app'; 
+import app from './app';
 
 describe('Course Endpoints', () => {
   it('GET /api/courses → should return 200 and a paginated object', async () => {

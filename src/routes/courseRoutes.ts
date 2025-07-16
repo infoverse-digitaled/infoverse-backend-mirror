@@ -116,7 +116,7 @@ courseRouter.post(
   isInstructor,
   courseValidationRules,
   validateRequest,
-  createCourse
+  createCourse,
 );
 
 /**
@@ -162,7 +162,7 @@ courseRouter.put(
   isInstructor,
   courseValidationRules,
   validateRequest,
-  updateCourse
+  updateCourse,
 );
 
 /**
