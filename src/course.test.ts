@@ -1,7 +1,16 @@
 import request from 'supertest';
-import app from './app'; 
+import app from './app';
+import mongoose from 'mongoose';
 
 describe('Course Endpoints', () => {
+  // ✅ Step 1: increase timeout for slow tests
+  jest.setTimeout(10000);
+
+  // ✅ Step 2: cleanup to close DB connection after tests
+  afterAll(async () => {
+    await mongoose.connection.close();
+  });
+
   it('GET /api/courses → should return 200 and a paginated object', async () => {
     const res = await request(app).get('/api/courses');
     expect(res.status).toBe(200);
