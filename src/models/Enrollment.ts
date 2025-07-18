@@ -27,5 +27,4 @@ EnrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true }); // Prevent
 EnrollmentSchema.index({ userId: 1 }); // Optimize user-specific queries
 EnrollmentSchema.index({ courseId: 1 }); // Optimize course-specific queries
 
-const Enrollment = mongoose.model<IEnrollment>('Enrollment', EnrollmentSchema);
-export default Enrollment;
+export default mongoose.model<IEnrollment>('Enrollment', EnrollmentSchema);

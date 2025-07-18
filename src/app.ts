@@ -7,11 +7,11 @@ import setupMiddleware from './middleware/index';
 import setRoutes from './routes/setRoutes';
 import authRoutes from './routes/auth';
 import { setupSwagger } from './swagger';
+import startServer from './server';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // MongoDB connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/infoverseDB';
@@ -24,6 +24,8 @@ mongoose
   .catch((err: Error) => {
     console.error('MongoDB connection error:', err);
   });
+
+startServer(app);
 
 // Middleware setup
 setupMiddleware(app);

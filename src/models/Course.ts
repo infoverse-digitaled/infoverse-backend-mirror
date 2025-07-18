@@ -46,5 +46,4 @@ const CourseSchema = new Schema<ICourse>(
 CourseSchema.index({ title: 'text', description: 'text' }); // Text search for title and description
 CourseSchema.index({ instructorId: 1 }); // Index for instructor-specific queries
 
-const Course = mongoose.model<ICourse>('Course', CourseSchema);
-export default Course;
+export default mongoose.model<ICourse>('Course', CourseSchema);

@@ -30,7 +30,6 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
-UserSchema.index({ email: 1 }); // Unique index for email lookups
 UserSchema.index({ role: 1 }); // Index for role-based queries
 
 export default mongoose.model<IUser>('User', UserSchema);
