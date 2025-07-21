@@ -30,6 +30,7 @@ export interface ICourse extends Document {
 export interface IEnrollment extends Document {
   userId: IUser['_id'];
   courseId: ICourse['_id'];
+  enrolledAt: Date;
   status: 'active' | 'completed' | 'dropped';
   createdAt: Date;
   updatedAt: Date;

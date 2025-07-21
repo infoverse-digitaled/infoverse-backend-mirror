@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { helloController } from '../controllers';
 import { authenticateJWT } from '../middleware/authMiddleware';
 import courseRouter from './courseRoutes'; // clear name
+import enrollmentRouter from './enrollmentRoutes';
+import userRouter from './userRoutes';
 
 const router = Router();
 
@@ -15,5 +17,7 @@ router.get('/profile', authenticateJWT, (req, res) => {
 });
 
 router.use('/courses', courseRouter); // now handles /api/courses
+router.use('/', enrollmentRouter);
+router.use('/users', userRouter); // now handles /api/users
 
 export default router;
