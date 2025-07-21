@@ -1,33 +1,33 @@
-import mongoose from 'mongoose';
-import User from './User';
-import Course from './Course';
+import mongoose, { Schema } from 'mongoose';
+import { IEnrollment } from './types';
 
-const EnrollmentSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: User,
-    required: [true, 'User is required'],
+const EnrollmentSchema = new Schema<IEnrollment>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'User is required'],
+    },
+    courseId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Course',
+      required: [true, 'Course is required'],
+    },
+    enrolledAt: {
+      type: Date,
+      default: Date.now,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'completed', 'dropped'],
+      default: 'active',
+    },
   },
-  courseId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: Course,
-    required: [true, 'Course is required'],
-  },
-  enrolledAt: {
-    type: Date,
-    default: Date.now,
-  },
-  status: {
-    type: String,
-    enum: ['active', 'completed', 'dropped'],
-    default: 'active',
-  },
-});
+  { timestamps: true },
+);
 
 // Indexes
 EnrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true }); // Prevent duplicate enrollments
-EnrollmentSchema.index({ userId: 1 }); // Optimize user-specific queries
-EnrollmentSchema.index({ courseId: 1 }); // Optimize course-specific queries
+EnrollmentSchema.index({ userId: 1 });
 
-const Enrollment = mongoose.model('Enrollment', EnrollmentSchema);
-export default Enrollment;
+export default mongoose.model<IEnrollment>('Enrollment', EnrollmentSchema);

@@ -21,10 +21,11 @@ const getPaginatedCourses = async (page: number, limit: number) => {
 };
 
 const findCourseById = async (id: string) => {
-  return await Course.findById(id);
+  const course = await Course.findById(id);
+  return course;
 };
 
-//Extend req typing for authenticated routes
+// Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -33,10 +34,10 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-//Controllers
+// Controllers
 export const listCourses = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
+  const page = parseInt(req.query.page as string, 10) || 1;
+  const limit = parseInt(req.query.limit as string, 10) || 10;
 
   const result = await getPaginatedCourses(page, limit);
   res.status(200).json(result);

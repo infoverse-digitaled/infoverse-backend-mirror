@@ -1,22 +1,35 @@
-import mongoose, { Document, Schema } from 'mongoose';
-
-export interface IUser extends Document {
-  email: string;
-  passwordHash: string;
-  name: string;
-  role: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import mongoose, { Schema } from 'mongoose';
+import { IUser } from './types';
 
 const UserSchema = new Schema<IUser>(
   {
-    email: { type: String, required: true, unique: true },
-    passwordHash: { type: String, required: true },
-    name: { type: String, required: true },
-    role: { type: String, default: 'user' },
+    email: {
+      type: String,
+      required: [true, 'Email is required'],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address'],
+    },
+    passwordHash: {
+      type: String,
+      required: [true, 'Password is required'],
+    },
+    name: {
+      type: String,
+      required: [true, 'Name is required'],
+      trim: true,
+    },
+    role: {
+      type: String,
+      enum: ['student', 'instructor'],
+      default: 'student',
+      required: true,
+    },
   },
   { timestamps: true },
 );
+
+UserSchema.index({ role: 1 }); // Index for role-based queries
 
 export default mongoose.model<IUser>('User', UserSchema);

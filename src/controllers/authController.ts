@@ -38,11 +38,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 
     res.status(200).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
   } catch (err) {
     next(err); // forward error to global handler
