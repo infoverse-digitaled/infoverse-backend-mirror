@@ -1,6 +1,15 @@
 import { Request, Response } from 'express';
+import { createClient } from 'redis';
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
+
+const redisClient = createClient();
+redisClient
+  .connect()
+  .then(() => {
+    console.log('Connected to Redis');
+  })
+  .catch((err) => console.error('Redis connection error:', err));
 
 // Internal helpers
 const getPaginatedCourses = async (page: number, limit: number) => {
@@ -38,21 +47,39 @@ interface AuthenticatedRequest extends Request {
 export const listCourses = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string, 10) || 1;
   const limit = parseInt(req.query.limit as string, 10) || 10;
-
-  const result = await getPaginatedCourses(page, limit);
-  res.status(200).json(result);
+  try {
+    const cachedCourses = await redisClient.get(`courses:${page}:${limit}`);
+    if (cachedCourses) {
+      return res.status(200).json(JSON.parse(cachedCourses)); // Cached response
+    }
+    const result = await getPaginatedCourses(page, limit);
+    await redisClient.setEx(`courses:${page}:${limit}`, 3600, JSON.stringify(result));
+    res.status(200).json(result);
+  } catch (error) {
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
 };
 
 export const getCourseById = async (req: Request, res: Response) => {
-  const course = await findCourseById(req.params.id);
-  if (!course) {
-    throw new HttpError(404, 'Course not found', 'NOT_FOUND');
+  try {
+    const cachedCourse = await redisClient.get(`course:${req.params.id}`);
+    if (cachedCourse) {
+      return res.status(200).json(JSON.parse(cachedCourse)); // Cached response
+    }
+    const course = await findCourseById(req.params.id);
+    await redisClient.setEx(`course:${req.params.id}`, 3600, JSON.stringify(course));
+    res.status(200).json({ data: course });
+    if (!course) {
+      throw new HttpError(404, 'Course not found', 'NOT_FOUND');
+    }
+  } catch (error) {
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
-  res.status(200).json({ data: course });
 };
 
 export const createCourse = async (req: AuthenticatedRequest, res: Response) => {
   const course = await Course.create({ ...req.body, instructorId: req.user!.id });
+  await redisClient.del('courses:*');
   res.status(201).json({ data: course });
 };
 
@@ -61,6 +88,8 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response) => 
   if (!course) {
     throw new HttpError(404, 'Course not found', 'NOT_FOUND');
   }
+  await redisClient.del(`course:${req.params.id}`);
+  await redisClient.del('courses:*');
   res.status(200).json({ data: course });
 };
 
@@ -69,5 +98,7 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response) => 
   if (!course) {
     throw new HttpError(404, 'Course not found', 'NOT_FOUND');
   }
+  await redisClient.del(`course:${req.params.id}`);
+  await redisClient.del('courses:*');
   res.status(200).json({ message: 'Course deleted' });
 };
