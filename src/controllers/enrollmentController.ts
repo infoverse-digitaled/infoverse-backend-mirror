@@ -41,37 +41,73 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
   }
 
   const enrollment = await Enrollment.create({ userId, courseId });
-  await redisClient.del(`userEnrollments:${userId}`);
-  await redisClient.del(`courseEnrollments:${courseId}`);
+  if (redisClient.isReady) {
+    try {
+      await redisClient.del(`userEnrollments:${userId}`);
+      await redisClient.del(`courseEnrollments:${courseId}`);
+    } catch (e) {
+      console.error('Failed to clear enrollment cache', e);
+    }
+  }
   res.status(201).json({ message: 'Enrolled successfully', data: enrollment });
 };
 
 export const getUserEnrollments = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
-  const cachedEnrollments = await redisClient.get(`userEnrollments:${userId}`);
-  if (cachedEnrollments) {
-    return res.status(200).json(JSON.parse(cachedEnrollments));
-  }
+  const cacheKey = `userEnrollments:${userId}`;
 
-  const enrollments = await Enrollment.find({ userId }).populate('courseId');
-  await redisClient.setEx(`userEnrollments:${userId}`, 3600, JSON.stringify({ data: enrollments }));
-  res.status(200).json({ data: enrollments });
+  try {
+    if (redisClient.isReady) {
+      const cachedEnrollments = await redisClient.get(cacheKey);
+      if (cachedEnrollments) {
+        return res.status(200).json(JSON.parse(cachedEnrollments));
+      }
+    }
+
+    const enrollments = await Enrollment.find({ userId }).populate('courseId');
+    const response = { data: enrollments };
+
+    if (redisClient.isReady) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+      } catch (e) {
+        console.error('Failed to cache user enrollments', e);
+      }
+    }
+    res.status(200).json(response);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
 };
 
 export const getCourseEnrollments = async (req: Request, res: Response) => {
   const { courseId } = req.params;
-  const cachedEnrollments = await redisClient.get(`courseEnrollments:${courseId}`);
-  if (cachedEnrollments) {
-    return res.status(200).json(JSON.parse(cachedEnrollments));
-  }
+  const cacheKey = `courseEnrollments:${courseId}`;
 
-  const enrollments = await Enrollment.find({ courseId }).populate('userId');
-  await redisClient.setEx(
-    `courseEnrollments:${courseId}`,
-    3600,
-    JSON.stringify({ data: enrollments }),
-  );
-  res.status(200).json({ data: enrollments });
+  try {
+    if (redisClient.isReady) {
+      const cachedEnrollments = await redisClient.get(cacheKey);
+      if (cachedEnrollments) {
+        return res.status(200).json(JSON.parse(cachedEnrollments));
+      }
+    }
+
+    const enrollments = await Enrollment.find({ courseId }).populate('userId');
+    const response = { data: enrollments };
+
+    if (redisClient.isReady) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+      } catch (e) {
+        console.error('Failed to cache course enrollments', e);
+      }
+    }
+    res.status(200).json(response);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
 };
 
 export const updateEnrollmentStatus = async (req: Request, res: Response) => {
@@ -83,8 +119,14 @@ export const updateEnrollmentStatus = async (req: Request, res: Response) => {
     throw new HttpError(404, 'Enrollment not found', 'NOT_FOUND');
   }
 
-  await redisClient.del(`userEnrollments:${(enrollment as any).userId}`);
-  await redisClient.del(`courseEnrollments:${(enrollment as any).courseId}`);
+  if (redisClient.isReady) {
+    try {
+      await redisClient.del(`userEnrollments:${(enrollment as any).userId}`);
+      await redisClient.del(`courseEnrollments:${(enrollment as any).courseId}`);
+    } catch (e) {
+      console.error('Failed to clear enrollment cache', e);
+    }
+  }
   res.status(200).json({ data: enrollment });
 };
 
@@ -97,7 +139,13 @@ export const dropCourse = async (req: AuthenticatedRequest, res: Response) => {
     throw new HttpError(404, 'Enrollment not found', 'NOT_FOUND');
   }
 
-  await redisClient.del(`userEnrollments:${userId}`);
-  await redisClient.del(`courseEnrollments:${courseId}`);
+  if (redisClient.isReady) {
+    try {
+      await redisClient.del(`userEnrollments:${userId}`);
+      await redisClient.del(`courseEnrollments:${courseId}`);
+    } catch (e) {
+      console.error('Failed to clear enrollment cache', e);
+    }
+  }
   res.status(200).json({ message: 'Successfully dropped course' });
 };

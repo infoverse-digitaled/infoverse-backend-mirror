@@ -47,39 +47,73 @@ interface AuthenticatedRequest extends Request {
 export const listCourses = async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string, 10) || 1;
   const limit = parseInt(req.query.limit as string, 10) || 10;
+  const cacheKey = `courses:${page}:${limit}`;
+
   try {
-    const cachedCourses = await redisClient.get(`courses:${page}:${limit}`);
-    if (cachedCourses) {
-      return res.status(200).json(JSON.parse(cachedCourses)); // Cached response
+    if (redisClient.isReady) {
+      const cachedCourses = await redisClient.get(cacheKey);
+      if (cachedCourses) {
+        return res.status(200).json(JSON.parse(cachedCourses));
+      }
     }
+
     const result = await getPaginatedCourses(page, limit);
-    await redisClient.setEx(`courses:${page}:${limit}`, 3600, JSON.stringify(result));
+
+    if (redisClient.isReady) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
+      } catch (e) {
+        console.error('Failed to cache courses', e);
+      }
+    }
     res.status(200).json(result);
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
 };
 
 export const getCourseById = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const cacheKey = `course:${id}`;
+
   try {
-    const cachedCourse = await redisClient.get(`course:${req.params.id}`);
-    if (cachedCourse) {
-      return res.status(200).json(JSON.parse(cachedCourse)); // Cached response
+    if (redisClient.isReady) {
+      const cachedCourse = await redisClient.get(cacheKey);
+      if (cachedCourse) {
+        return res.status(200).json(JSON.parse(cachedCourse));
+      }
     }
-    const course = await findCourseById(req.params.id);
-    await redisClient.setEx(`course:${req.params.id}`, 3600, JSON.stringify(course));
-    res.status(200).json({ data: course });
+
+    const course = await findCourseById(id);
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
+
+    const response = { data: course };
+    if (redisClient.isReady) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+      } catch (e) {
+        console.error('Failed to cache course', e);
+      }
+    }
+    res.status(200).json(response);
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
 };
 
 export const createCourse = async (req: AuthenticatedRequest, res: Response) => {
   const course = await Course.create({ ...req.body, instructorId: req.user!.id });
-  await redisClient.del('courses:*');
+  if (redisClient.isReady) {
+    try {
+      await redisClient.del('courses:*');
+    } catch (e) {
+      console.error('Failed to clear course cache', e);
+    }
+  }
   res.status(201).json({ data: course });
 };
 
@@ -88,8 +122,14 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response) => 
   if (!course) {
     throw new HttpError(404, 'Course not found', 'NOT_FOUND');
   }
-  await redisClient.del(`course:${req.params.id}`);
-  await redisClient.del('courses:*');
+  if (redisClient.isReady) {
+    try {
+      await redisClient.del(`course:${req.params.id}`);
+      await redisClient.del('courses:*');
+    } catch (e) {
+      console.error('Failed to clear course cache', e);
+    }
+  }
   res.status(200).json({ data: course });
 };
 
@@ -98,7 +138,13 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response) => 
   if (!course) {
     throw new HttpError(404, 'Course not found', 'NOT_FOUND');
   }
-  await redisClient.del(`course:${req.params.id}`);
-  await redisClient.del('courses:*');
+  if (redisClient.isReady) {
+    try {
+      await redisClient.del(`course:${req.params.id}`);
+      await redisClient.del('courses:*');
+    } catch (e) {
+      console.error('Failed to clear course cache', e);
+    }
+  }
   res.status(200).json({ message: 'Course deleted' });
 };

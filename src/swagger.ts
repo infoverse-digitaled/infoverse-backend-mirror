@@ -28,4 +28,8 @@ const specs = swaggerJsdoc(options);
 
 export const setupSwagger = (app: Express) => {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+  app.get('/swagger.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(specs);
+  });
 };

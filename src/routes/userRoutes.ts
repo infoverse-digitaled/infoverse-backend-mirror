@@ -5,9 +5,8 @@
  *   description: User profile operations
  */
 
-
 import express from 'express';
-import { getUserProfile, updateUserProfile } from '../controllers/usercontroller';
+import { getUserProfile, updateUserProfile } from '../controllers/userController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 
 const userRouter = express.Router();
