@@ -23,10 +23,15 @@ export const getCourseReviews = async (req: Request, res: Response) => {
 export const postReview = async (req: AuthenticatedRequest, res: Response) => {
   const { courseId, rating, comment } = req.body;
   const userId = req.user!.id;
+  const { role = req.user!.role } = req.user!;
 
   try {
-    const review = await Review.create({ courseId, userId, rating, comment });
-    res.status(201).json({ message: 'Review posted successfully', data: review });
+    if (role === 'student') {
+      const review = await Review.create({ courseId, userId, rating, comment });
+      res.status(201).json({ message: 'Review posted successfully', data: review });
+    } else {
+      throw new HttpError(403, 'Forbidden', 'FORBIDDEN');
+    }
   } catch (error) {
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
