@@ -6,7 +6,7 @@
  */
 
 import express from 'express';
-import { getUserProfile, updateUserProfile } from '../controllers/userController';
+import { getUserProfile, updateUserProfile, getMyReviews } from '../controllers/userController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 
 const userRouter = express.Router();
@@ -66,5 +66,7 @@ userRouter.get('/me/profile', authenticateJWT, getUserProfile);
  *         description: Unauthorized
  */
 userRouter.put('/me/profile', authenticateJWT, updateUserProfile);
+
+userRouter.get('/me/reviews', authenticateJWT, getMyReviews);
 
 export default userRouter;

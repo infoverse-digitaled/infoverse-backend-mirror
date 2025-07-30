@@ -35,3 +35,13 @@ export interface IEnrollment extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Reviesw Interface
+export interface IReview extends Document {
+  userId: IUser['_id'];
+  courseId: ICourse['_id'];
+  rating: number;
+  comment?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
