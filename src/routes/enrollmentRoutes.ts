@@ -8,7 +8,6 @@
 import express from 'express';
 import {
   enrollInCourse,
-  getUserEnrollments,
   getCourseEnrollments,
   updateEnrollmentStatus,
   dropCourse,
@@ -17,7 +16,6 @@ import { authenticateJWT } from '../middleware/authMiddleware';
 import { isInstructor } from '../middleware/isInstructor';
 
 const enrollmentRouter = express.Router();
-
 /**
  * @swagger
  * /api/courses/{courseId}/enroll:
@@ -40,38 +38,7 @@ const enrollmentRouter = express.Router();
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.post('/courses/:courseId/enroll', authenticateJWT, enrollInCourse);
-
-/**
- * @swagger
- * /api/users/me/courses:
- *   get:
- *     summary: Get all courses the user is enrolled in
- *     tags: [Enrollments]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of enrolled courses
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       courseId:
- *                         type: string
- *                       title:
- *                         type: string
- *                       enrolledAt:
- *                         type: string
- *                         format: date-time
- */
-enrollmentRouter.get('/users/me/courses', authenticateJWT, getUserEnrollments);
+enrollmentRouter.post('/enrollments /:courseId/enroll', authenticateJWT, enrollInCourse);
 
 /**
  * @swagger
@@ -95,12 +62,7 @@ enrollmentRouter.get('/users/me/courses', authenticateJWT, getUserEnrollments);
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.get(
-  '/courses/:courseId/enrollments',
-  authenticateJWT,
-  isInstructor,
-  getCourseEnrollments,
-);
+enrollmentRouter.get('/enrollments/:courseId/enrollments', authenticateJWT, isInstructor, getCourseEnrollments);
 
 /**
  * @swagger
@@ -161,6 +123,6 @@ enrollmentRouter.put(
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.delete('/courses/:courseId/drop', authenticateJWT, dropCourse);
+enrollmentRouter.delete('/enrollments/:courseId/drop', authenticateJWT, dropCourse);
 
 export default enrollmentRouter;

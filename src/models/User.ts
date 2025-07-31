@@ -22,7 +22,7 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['student', 'instructor'],
+      enum: ['student', 'instructor', 'admin'],
       default: 'student',
       required: true,
     },

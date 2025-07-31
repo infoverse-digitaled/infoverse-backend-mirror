@@ -1,16 +1,9 @@
 import { Request, Response } from 'express';
-import { createClient } from 'redis';
 import User from '../models/User';
+import Enrollment from '../models/Enrollment';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
-
-const redisClient = createClient();
-redisClient
-  .connect()
-  .then(() => {
-    console.log('Connected to Redis');
-  })
-  .catch((err) => console.error('Redis connection error:', err));
+import { redisClient } from '../server';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -76,7 +69,7 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
   }
 };
 
-export const getMyReviews = async (req: AuthenticatedRequest, res: Response) => {
+export const getUserReviews = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
   const cacheKey = `user:${userId}:reviews`;
   try {
@@ -98,6 +91,35 @@ export const getMyReviews = async (req: AuthenticatedRequest, res: Response) => 
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
         console.error('Failed to cache user reviews', e);
+      }
+    }
+    res.status(200).json(response);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};
+
+export const getUserEnrollments = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const cacheKey = `userEnrollments:${userId}`;
+
+  try {
+    if (redisClient.isReady) {
+      const cachedEnrollments = await redisClient.get(cacheKey);
+      if (cachedEnrollments) {
+        return res.status(200).json(JSON.parse(cachedEnrollments));
+      }
+    }
+
+    const enrollments = await Enrollment.find({ userId }).populate('courseId');
+    const response = { data: enrollments };
+
+    if (redisClient.isReady) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+      } catch (e) {
+        console.error('Failed to cache user enrollments', e);
       }
     }
     res.status(200).json(response);

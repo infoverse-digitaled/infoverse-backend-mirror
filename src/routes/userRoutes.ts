@@ -6,7 +6,12 @@
  */
 
 import express from 'express';
-import { getUserProfile, updateUserProfile, getMyReviews } from '../controllers/userController';
+import {
+  getUserProfile,
+  updateUserProfile,
+  getUserReviews,
+  getUserEnrollments,
+} from '../controllers/userController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 
 const userRouter = express.Router();
@@ -67,6 +72,83 @@ userRouter.get('/me/profile', authenticateJWT, getUserProfile);
  */
 userRouter.put('/me/profile', authenticateJWT, updateUserProfile);
 
-userRouter.get('/me/reviews', authenticateJWT, getMyReviews);
+/**
+ * @swagger
+ * /api/users/me/enrollments:
+ *   get:
+ *     summary: Get all courses the user is enrolled in
+ *     tags: [Enrollments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of enrolled courses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       courseId:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       enrolledAt:
+ *                         type: string
+ *                         format: date-time
+ */
+userRouter.get('/me/enrollments', authenticateJWT, getUserEnrollments);
+/**
+ * @swagger
+ * /api/users/me/reviews:
+ *   get:
+ *     summary: Get current user's reviews
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of reviews by the current user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "60c72b2f9b1e8e001c8e4b8a"
+ *                       courseId:
+ *                         type: string
+ *                         example: "60c72b2f9b1e8e001c8e4b8b"
+ *                       userId:
+ *                         type: string
+ *                         example: "60c72b2f9b1e8e001c8e4b8c"
+ *                       rating:
+ *                         type: integer
+ *                         example: 5
+ *                       comment:
+ *                         type: string
+ *                         example: "Great course!"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-07-31T12:34:56.789Z"
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-07-31T12:34:56.789Z"
+ *       401:
+ *         description: Unauthorized
+ */
+userRouter.get('/me/reviews', authenticateJWT, getUserReviews);
 
 export default userRouter;

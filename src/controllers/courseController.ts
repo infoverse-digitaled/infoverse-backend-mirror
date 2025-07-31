@@ -1,15 +1,7 @@
 import { Request, Response } from 'express';
-import { createClient } from 'redis';
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
-
-const redisClient = createClient();
-redisClient
-  .connect()
-  .then(() => {
-    console.log('Connected to Redis');
-  })
-  .catch((err) => console.error('Redis connection error:', err));
+import { redisClient } from '../server';
 
 // Internal helpers
 const getPaginatedCourses = async (page: number, limit: number) => {
