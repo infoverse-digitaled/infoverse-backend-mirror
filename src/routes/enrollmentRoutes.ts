@@ -38,7 +38,7 @@ const enrollmentRouter = express.Router();
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.post('/enrollments /:courseId/enroll', authenticateJWT, enrollInCourse);
+enrollmentRouter.post('/:courseId/enroll', authenticateJWT, enrollInCourse);
 
 /**
  * @swagger
@@ -62,7 +62,7 @@ enrollmentRouter.post('/enrollments /:courseId/enroll', authenticateJWT, enrollI
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.get('/enrollments/:courseId/enrollments', authenticateJWT, isInstructor, getCourseEnrollments);
+enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, getCourseEnrollments);
 
 /**
  * @swagger
@@ -96,12 +96,7 @@ enrollmentRouter.get('/enrollments/:courseId/enrollments', authenticateJWT, isIn
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.put(
-  '/enrollments/:enrollmentId',
-  authenticateJWT,
-  isInstructor,
-  updateEnrollmentStatus,
-);
+enrollmentRouter.put('/:enrollmentId', authenticateJWT, isInstructor, updateEnrollmentStatus);
 
 /**
  * @swagger
@@ -123,6 +118,6 @@ enrollmentRouter.put(
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.delete('/enrollments/:courseId/drop', authenticateJWT, dropCourse);
+enrollmentRouter.delete('/:courseId/drop', authenticateJWT, dropCourse);
 
 export default enrollmentRouter;

@@ -77,7 +77,7 @@ userRouter.put('/me/profile', authenticateJWT, updateUserProfile);
  * /api/users/me/enrollments:
  *   get:
  *     summary: Get all courses the user is enrolled in
- *     tags: [Enrollments]
+ *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     responses:
