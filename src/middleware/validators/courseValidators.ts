@@ -1,12 +1,16 @@
 import { body } from 'express-validator';
 
 export const courseValidationRules = [
-  body('title').notEmpty().withMessage('Title is required'),
-  body('description').notEmpty().withMessage('Description is required'),
+  body('title').notEmpty().withMessage('Title is required').trim().escape(),
+  body('description').notEmpty().withMessage('Description is required').trim().escape(),
   body('price').isNumeric().isFloat({ gt: 0 }).withMessage('Price must be a positive number'),
   body('thumbnailUrl').isURL().withMessage('Thumbnail URL must be a valid URL'),
   body('syllabus').notEmpty().isArray({ min: 1 }).withMessage('Syllabus is required'),
-  body('syllabus.*.title').notEmpty().withMessage('Syllabus item title is required'),
+  body('syllabus.*.title')
+    .notEmpty()
+    .withMessage('Syllabus item title is required')
+    .trim()
+    .escape(),
   body('syllabus.*.contentType')
     .notEmpty()
     .isIn(['video', 'text', 'quiz'])
