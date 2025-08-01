@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { getCourseReviews, postReview } from '../controllers/reviewController';
 import { authenticateJWT } from '../middleware/authMiddleware';
-import { isStudent } from '../middleware/isStudent';
+import { isStudent } from '../middleware/roles/isStudent';
+import { reviewValidationRules } from '../middleware/validators/reviewValidators';
+import validateRequest from '../middleware/validators/validateRequest';
 
 const router = Router();
 
@@ -121,6 +123,13 @@ const router = Router();
  *         description: Unauthorized
  */
 router.get('/:courseId/reviews', getCourseReviews);
-router.post('/:courseId/reviews', authenticateJWT, postReview, isStudent);
+router.post(
+  '/:courseId/reviews',
+  authenticateJWT,
+  isStudent,
+  reviewValidationRules,
+  validateRequest,
+  postReview,
+);
 
 export default router;

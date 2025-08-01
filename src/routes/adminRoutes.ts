@@ -9,7 +9,7 @@ import {
 } from '../controllers/adminControllers/adminController';
 import { getCourseById, createCourse } from '../controllers/courseController';
 import { authenticateJWT } from '../middleware/authMiddleware';
-import { isAdmin } from '../middleware/isAdmin';
+import { isAdmin } from '../middleware/roles/isAdmin';
 
 const router = Router();
 

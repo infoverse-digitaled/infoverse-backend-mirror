@@ -6,6 +6,8 @@
  */
 
 import express from 'express';
+import validateRequest from '../middleware/validators/validateRequest';
+import { userupdateValidationRules } from '../middleware/validators/userValidators';
 import {
   getUserProfile,
   updateUserProfile,
@@ -70,7 +72,13 @@ userRouter.get('/me/profile', authenticateJWT, getUserProfile);
  *       401:
  *         description: Unauthorized
  */
-userRouter.put('/me/profile', authenticateJWT, updateUserProfile);
+userRouter.put(
+  '/me/profile',
+  authenticateJWT,
+  userupdateValidationRules,
+  validateRequest,
+  updateUserProfile,
+);
 
 /**
  * @swagger

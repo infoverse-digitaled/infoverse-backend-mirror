@@ -12,8 +12,10 @@ import {
   updateEnrollmentStatus,
   dropCourse,
 } from '../controllers/enrollmentController';
+import validateRequest from '../middleware/validators/validateRequest';
+import { updateEnrollmentValidationRules } from '../middleware/validators/enrollmentValidators';
 import { authenticateJWT } from '../middleware/authMiddleware';
-import { isInstructor } from '../middleware/isInstructor';
+import { isInstructor } from '../middleware/roles/isInstructor';
 
 const enrollmentRouter = express.Router();
 /**
@@ -96,7 +98,14 @@ enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, ge
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.put('/:enrollmentId', authenticateJWT, isInstructor, updateEnrollmentStatus);
+enrollmentRouter.put(
+  '/:enrollmentId',
+  authenticateJWT,
+  isInstructor,
+  updateEnrollmentValidationRules,
+  validateRequest,
+  updateEnrollmentStatus,
+);
 
 /**
  * @swagger

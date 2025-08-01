@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
@@ -16,6 +17,9 @@ export const getCourseReviews = async (req: Request, res: Response) => {
   const cacheKey = `reviews:${courseId}`;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
+    }
     if (redisClient.isReady) {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
@@ -46,17 +50,12 @@ export const postReview = async (req: AuthenticatedRequest, res: Response) => {
     const { rating, comment } = req.body;
     const userId = req.user!.id;
     const { courseId } = req.params;
-
-    if (!courseId) {
-      return res.status(400).json({ message: 'Course ID is required in the URL.' });
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
     }
-    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: 'Rating must be a number between 1 and 5.' });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
-    if (!comment || typeof comment !== 'string') {
-      return res.status(400).json({ message: 'Comment is required.' });
-    }
-
     const review = await Review.create({ courseId, userId, rating, comment });
     return res.status(201).json({ message: 'Review posted successfully', data: review });
   } catch (error) {

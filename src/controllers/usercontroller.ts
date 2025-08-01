@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import User from '../models/User';
 import Enrollment from '../models/Enrollment';
 import Review from '../models/Review';
@@ -16,7 +17,9 @@ interface AuthenticatedRequest extends Request {
 export const getUserProfile = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
   const cacheKey = `user:${userId}`;
-
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+  }
   try {
     if (redisClient.isReady) {
       const cachedProfile = await redisClient.get(cacheKey);
@@ -50,6 +53,15 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
   const update = req.body;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
+    if (update.email) {
+      const existingUser = await User.findOne({ email: update.email, _id: { $ne: userId } });
+      if (existingUser) {
+        throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
+      }
+    }
     const updatedProfile = await User.findByIdAndUpdate(userId, update, { new: true });
     if (!updatedProfile) {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
@@ -73,6 +85,9 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
   const userId = req.user!.id;
   const cacheKey = `user:${userId}:reviews`;
   try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
     if (redisClient.isReady) {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
@@ -105,6 +120,9 @@ export const getUserEnrollments = async (req: AuthenticatedRequest, res: Respons
   const cacheKey = `userEnrollments:${userId}`;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
     if (redisClient.isReady) {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
