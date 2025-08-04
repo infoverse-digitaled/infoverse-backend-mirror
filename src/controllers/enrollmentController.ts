@@ -4,6 +4,7 @@ import Enrollment from '../models/Enrollment';
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
+import { emailQueue } from '../utils/emailQueue'; // Assuming you have a queue setup for sending emails
 
 // Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
@@ -11,6 +12,7 @@ interface AuthenticatedRequest extends Request {
     id: string;
     role: string;
     email?: string;
+    name?: string; // Assuming name is available on the user object
   };
 }
 
@@ -33,6 +35,20 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
   }
 
   const enrollment = await Enrollment.create({ userId, courseId });
+
+  // --- CHANGE STARTS HERE ---
+  // Add a job to the queue to send a confirmation email
+  if (req.user?.email) {
+    // Check if user email exists
+    await emailQueue.add('send-enrollment-confirmation', {
+      email: req.user.email,
+      name: req.user.name,
+      courseTitle: course.title,
+    });
+    console.log(`Job added to queue for user ${req.user.email}`);
+  }
+  // --- CHANGE ENDS HERE ---
+
   if (redisClient.isReady) {
     try {
       await redisClient.del(`userEnrollments:${userId}`);
@@ -41,7 +57,10 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
       console.error('Failed to clear enrollment cache', e);
     }
   }
-  res.status(201).json({ message: 'Enrolled successfully', data: enrollment });
+  res.status(201).json({
+    message: 'Enrolled successfully! A confirmation email is being sent.',
+    data: enrollment,
+  });
 };
 
 export const getCourseEnrollments = async (req: Request, res: Response) => {
