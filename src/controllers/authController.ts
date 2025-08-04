@@ -9,12 +9,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret'; // use dotenv in real env
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, password } = req.body;
-
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
     }
-
     const passwordHash = await bcrypt.hash(password, 10);
     await User.create({ name, email, passwordHash });
 
@@ -27,6 +25,9 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
 
     const user = await User.findOne({ email });
     if (!user) {

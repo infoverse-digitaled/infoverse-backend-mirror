@@ -7,6 +7,8 @@
 
 import { Router } from 'express';
 import { register, login } from '../controllers/authController';
+import { authValidationRules } from '../middleware/validators/authValidators';
+import validateRequest from '../middleware/validators/validateRequest';
 
 const router = Router();
 
@@ -42,7 +44,7 @@ router.post('/test', (_req, res) => res.json({ ok: true }));
  *       400:
  *         description: Email already in use
  */
-router.post('/register', register);
+router.post('/register', authValidationRules, validateRequest, register);
 
 /**
  * @swagger

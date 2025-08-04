@@ -14,9 +14,12 @@ import {
   deleteCourse,
 } from '../controllers/courseController';
 import { authenticateJWT } from '../middleware/authMiddleware';
-import { isInstructor } from '../middleware/isInstructor';
-import { courseValidationRules } from '../middleware/courseValidator';
-import validateRequest from '../middleware/validateRequest';
+import { isInstructor } from '../middleware/roles/isInstructor';
+import {
+  courseValidationRules,
+  updateCourseValidationRules,
+} from '../middleware/validators/courseValidators';
+import validateRequest from '../middleware/validators/validateRequest';
 
 const courseRouter = express.Router();
 
@@ -160,7 +163,7 @@ courseRouter.put(
   '/:id',
   authenticateJWT,
   isInstructor,
-  courseValidationRules,
+  updateCourseValidationRules,
   validateRequest,
   updateCourse,
 );

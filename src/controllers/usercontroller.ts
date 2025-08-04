@@ -1,16 +1,10 @@
 import { Request, Response } from 'express';
-import { createClient } from 'redis';
+import mongoose from 'mongoose';
 import User from '../models/User';
+import Enrollment from '../models/Enrollment';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
-
-const redisClient = createClient();
-redisClient
-  .connect()
-  .then(() => {
-    console.log('Connected to Redis');
-  })
-  .catch((err) => console.error('Redis connection error:', err));
+import { redisClient } from '../server';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -23,7 +17,9 @@ interface AuthenticatedRequest extends Request {
 export const getUserProfile = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
   const cacheKey = `user:${userId}`;
-
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+  }
   try {
     if (redisClient.isReady) {
       const cachedProfile = await redisClient.get(cacheKey);
@@ -57,6 +53,15 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
   const update = req.body;
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
+    if (update.email) {
+      const existingUser = await User.findOne({ email: update.email, _id: { $ne: userId } });
+      if (existingUser) {
+        throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
+      }
+    }
     const updatedProfile = await User.findByIdAndUpdate(userId, update, { new: true });
     if (!updatedProfile) {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
@@ -76,10 +81,13 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
   }
 };
 
-export const getMyReviews = async (req: AuthenticatedRequest, res: Response) => {
+export const getUserReviews = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id;
   const cacheKey = `user:${userId}:reviews`;
   try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
     if (redisClient.isReady) {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
@@ -98,6 +106,38 @@ export const getMyReviews = async (req: AuthenticatedRequest, res: Response) => 
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
         console.error('Failed to cache user reviews', e);
+      }
+    }
+    res.status(200).json(response);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};
+
+export const getUserEnrollments = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const cacheKey = `userEnrollments:${userId}`;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
+    if (redisClient.isReady) {
+      const cachedEnrollments = await redisClient.get(cacheKey);
+      if (cachedEnrollments) {
+        return res.status(200).json(JSON.parse(cachedEnrollments));
+      }
+    }
+
+    const enrollments = await Enrollment.find({ userId }).populate('courseId');
+    const response = { data: enrollments };
+
+    if (redisClient.isReady) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+      } catch (e) {
+        console.error('Failed to cache user enrollments', e);
       }
     }
     res.status(200).json(response);

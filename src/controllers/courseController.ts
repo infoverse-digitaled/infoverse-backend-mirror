@@ -1,15 +1,8 @@
 import { Request, Response } from 'express';
-import { createClient } from 'redis';
+import mongoose from 'mongoose';
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
-
-const redisClient = createClient();
-redisClient
-  .connect()
-  .then(() => {
-    console.log('Connected to Redis');
-  })
-  .catch((err) => console.error('Redis connection error:', err));
+import { redisClient } from '../server';
 
 // Internal helpers
 const getPaginatedCourses = async (page: number, limit: number) => {
@@ -76,7 +69,9 @@ export const listCourses = async (req: Request, res: Response) => {
 export const getCourseById = async (req: Request, res: Response) => {
   const { id } = req.params;
   const cacheKey = `course:${id}`;
-
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
+  }
   try {
     if (redisClient.isReady) {
       const cachedCourse = await redisClient.get(cacheKey);
@@ -106,45 +101,71 @@ export const getCourseById = async (req: Request, res: Response) => {
 };
 
 export const createCourse = async (req: AuthenticatedRequest, res: Response) => {
-  const course = await Course.create({ ...req.body, instructorId: req.user!.id });
-  if (redisClient.isReady) {
-    try {
-      await redisClient.del('courses:*');
-    } catch (e) {
-      console.error('Failed to clear course cache', e);
-    }
+  const instructorId = req.user!.id;
+  if (!mongoose.Types.ObjectId.isValid(instructorId)) {
+    throw new HttpError(400, 'Invalid instructor ID', 'INVALID_ID');
   }
-  res.status(201).json({ data: course });
+  try {
+    const course = await Course.create({ ...req.body, instructorId: req.user!.id });
+    if (redisClient.isReady) {
+      try {
+        await redisClient.del('courses:*');
+      } catch (e) {
+        console.error('Failed to clear course cache', e);
+      }
+    }
+    res.status(201).json({ data: course });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
 };
 
 export const updateCourse = async (req: AuthenticatedRequest, res: Response) => {
-  const course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!course) {
-    throw new HttpError(404, 'Course not found', 'NOT_FOUND');
-  }
-  if (redisClient.isReady) {
-    try {
-      await redisClient.del(`course:${req.params.id}`);
-      await redisClient.del('courses:*');
-    } catch (e) {
-      console.error('Failed to clear course cache', e);
+  try {
+    const course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      throw new HttpError(400, 'Invalid ID', 'INVALID_ID');
     }
+    if (!course) {
+      throw new HttpError(404, 'Course not found', 'NOT_FOUND');
+    }
+    if (redisClient.isReady) {
+      try {
+        await redisClient.del(`course:${req.params.id}`);
+        await redisClient.del('courses:*');
+      } catch (e) {
+        console.error('Failed to clear course cache', e);
+      }
+    }
+    res.status(200).json({ data: course });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
-  res.status(200).json({ data: course });
 };
 
 export const deleteCourse = async (req: AuthenticatedRequest, res: Response) => {
-  const course = await Course.findByIdAndDelete(req.params.id);
-  if (!course) {
-    throw new HttpError(404, 'Course not found', 'NOT_FOUND');
-  }
-  if (redisClient.isReady) {
-    try {
-      await redisClient.del(`course:${req.params.id}`);
-      await redisClient.del('courses:*');
-    } catch (e) {
-      console.error('Failed to clear course cache', e);
+  const courseId = req.params.id;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      throw new HttpError(400, 'Invalid ID', 'INVALID_ID');
     }
+    const course = await Course.findByIdAndDelete(courseId);
+    if (!course) {
+      throw new HttpError(404, 'Course not found', 'NOT_FOUND');
+    }
+    if (redisClient.isReady) {
+      try {
+        await redisClient.del(`course:${req.params.id}`);
+        await redisClient.del('courses:*');
+      } catch (e) {
+        console.error('Failed to clear course cache', e);
+      }
+    }
+    res.status(200).json({ message: 'Course deleted' });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
-  res.status(200).json({ message: 'Course deleted' });
 };
