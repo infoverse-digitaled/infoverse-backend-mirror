@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { register, login } from '../controllers/authController';
 import { authValidationRules } from '../middleware/validators/authValidators';
 import validateRequest from '../middleware/validators/validateRequest';
+import { authLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.post('/test', (_req, res) => res.json({ ok: true }));
  *       400:
  *         description: Email already in use
  */
-router.post('/register', authValidationRules, validateRequest, register);
+router.post('/register', authLimiter, authValidationRules, validateRequest, register);
 
 /**
  * @swagger
@@ -65,6 +66,6 @@ router.post('/register', authValidationRules, validateRequest, register);
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', login);
+router.post('/login', authLimiter, login);
 
 export default router;

@@ -1,31 +1,8 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
+import mongoose, { Query } from 'mongoose'; // <-- 1. Import the Query type
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
-
-// Internal helpers
-const getPaginatedCourses = async (page: number, limit: number) => {
-  const skip = (page - 1) * limit;
-  const total = await Course.countDocuments();
-  const data = await Course.find().skip(skip).limit(limit);
-
-  return {
-    data,
-    pagination: {
-      total_records: total,
-      current_page: page,
-      total_pages: Math.ceil(total / limit),
-      next_page: page * limit < total ? page + 1 : null,
-      prev_page: page > 1 ? page - 1 : null,
-    },
-  };
-};
-
-const findCourseById = async (id: string) => {
-  const course = await Course.findById(id);
-  return course;
-};
 
 // Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
@@ -36,11 +13,20 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-// Controllers
 export const listCourses = async (req: Request, res: Response) => {
-  const page = parseInt(req.query.page as string, 10) || 1;
-  const limit = parseInt(req.query.limit as string, 10) || 10;
-  const cacheKey = `courses:${page}:${limit}`;
+  const { page = 1, limit = 10, sort, fields } = req.query;
+
+  const filters: { [key: string]: any } = { ...req.query };
+  delete filters.page;
+  delete filters.limit;
+  delete filters.sort;
+  delete filters.fields;
+
+  const pageNum = parseInt(page as string, 10);
+  const limitNum = parseInt(limit as string, 10);
+  const skip = (pageNum - 1) * limitNum;
+
+  const cacheKey = `courses:page=${pageNum}&limit=${limitNum}&sort=${sort || ''}&fields=${fields || ''}`;
 
   try {
     if (redisClient.isReady) {
@@ -50,14 +36,44 @@ export const listCourses = async (req: Request, res: Response) => {
       }
     }
 
-    const result = await getPaginatedCourses(page, limit);
+    // --- FIX STARTS HERE ---
+    // 2. Explicitly type the 'query' variable to prevent type conflicts
+    let query: Query<any, any> = Course.find(filters);
+    // --- FIX ENDS HERE ---
+
+    // Sorting Logic
+    if (sort) {
+      const sortBy = (sort as string).split(',').join(' ');
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('-createdAt');
+    }
+
+    // Field Limiting (Projection) Logic
+    if (fields) {
+      const fieldsList = (fields as string).split(',').join(' ');
+      query = query.select(fieldsList);
+    }
+
+    query = query.skip(skip).limit(limitNum);
+    
+    const courses = await query;
+    const totalRecords = await Course.countDocuments(filters);
+    const totalPages = Math.ceil(totalRecords / limitNum);
+
+    const result = {
+      data: courses,
+      pagination: {
+        total_records: totalRecords,
+        current_page: pageNum,
+        total_pages: totalPages,
+        next_page: pageNum < totalPages ? pageNum + 1 : null,
+        prev_page: pageNum > 1 ? pageNum - 1 : null,
+      },
+    };
 
     if (redisClient.isReady) {
-      try {
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
-      } catch (e) {
-        console.error('Failed to cache courses', e);
-      }
+      await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
     }
     res.status(200).json(result);
   } catch (error) {
@@ -80,7 +96,7 @@ export const getCourseById = async (req: Request, res: Response) => {
       }
     }
 
-    const course = await findCourseById(id);
+    const course = await Course.findById(id);
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
@@ -109,7 +125,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
     const course = await Course.create({ ...req.body, instructorId: req.user!.id });
     if (redisClient.isReady) {
       try {
-        await redisClient.del('courses:*');
+        await redisClient.del('courses:*'); 
       } catch (e) {
         console.error('Failed to clear course cache', e);
       }
