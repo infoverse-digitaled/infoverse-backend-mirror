@@ -10,6 +10,7 @@ const UserSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address'],
+      index: true, // <-- Added index here for faster lookups during login
     },
     passwordHash: {
       type: String,
@@ -30,6 +31,6 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
-UserSchema.index({ role: 1 }); // Index for role-based queries
+UserSchema.index({ role: 1 }); // Your existing index for role-based queries
 
 export default mongoose.model<IUser>('User', UserSchema);

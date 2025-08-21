@@ -9,16 +9,29 @@ import authRoutes from './routes/auth';
 import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
-import statusMonitor from 'express-status-monitor'; // <-- 1. IMPORT status monitor
-import logger from './utils/logger'; // <-- 2. IMPORT your logger
+import statusMonitor from 'express-status-monitor';
+import logger from './utils/logger';
+import compression from 'compression';
+import cors from 'cors';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 
-// 3. APPLY status monitor as one of the first middleware
-// This will create a /status page to monitor your app's health
+// Use express-status-monitor early in the middleware stack.
 app.use(statusMonitor());
+
+// Gzip compression for all responses. This should be very early.
+app.use(compression());
+
+// Configure CORS to allow requests from the Next.js frontend URL.
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
+
+// Serve static files from the 'public' directory at the root of the project.
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // MongoDB connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/infoverseDB';
@@ -26,11 +39,9 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/infoverseD
 mongoose
   .connect(MONGO_URI)
   .then(() => {
-    // Use the logger for important events
     logger.info('Connected to MongoDB');
   })
   .catch((err: Error) => {
-    // Use the logger for errors
     logger.error('MongoDB connection error:', err);
   });
 
@@ -39,14 +50,14 @@ startServer(app);
 // Middleware setup
 setupMiddleware(app);
 
-// Apply the general rate limiter to all routes starting with /api
-app.use('/api', apiLimiter);
+// Apply the general rate limiter to all routes starting with /api/v1
+app.use('/api/v1', apiLimiter);
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Routes for version 1
+app.use('/api/v1/auth', authRoutes);
 setRoutes(app);
 
-// 4. ADD a health check endpoint for simple uptime checks
+// Add a health check endpoint for simple uptime checks.
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'UP', timestamp: new Date().toISOString() });
 });
@@ -55,8 +66,6 @@ app.get('/health', (_req: Request, res: Response) => {
 setupSwagger(app);
 
 // Global error handler
-// You can enhance your errorHandler to use the logger
-// For example: logger.error(err.message, { stack: err.stack });
 app.use(errorHandler);
 
 export default app;

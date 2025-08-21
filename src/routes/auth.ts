@@ -66,6 +66,6 @@ router.post('/register', authLimiter, authValidationRules, validateRequest, regi
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', authLimiter, login);
+router.post('/login', authLimiter, authValidationRules, validateRequest, login);
 
 export default router;

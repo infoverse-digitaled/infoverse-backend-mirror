@@ -7,6 +7,7 @@ const CourseSchema = new Schema<ICourse>(
       type: String,
       required: [true, 'Title is required'],
       trim: true,
+      index: true, // <-- Add index here for general queries
     },
     description: {
       type: String,

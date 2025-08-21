@@ -13,7 +13,7 @@ import {
   updateUserProfile,
   getUserReviews,
   getUserEnrollments,
-} from '../controllers/userController';
+} from '../controllers/usercontroller';
 import { authenticateJWT } from '../middleware/authMiddleware';
 
 const userRouter = express.Router();
