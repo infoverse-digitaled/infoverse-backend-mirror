@@ -14,19 +14,24 @@ interface AuthenticatedRequest extends Request {
 }
 
 export const listCourses = async (req: Request, res: Response) => {
-  const { page = 1, limit = 10, sort, fields } = req.query;
+  const { page = 1, limit = 10, sort, fields, search } = req.query;
 
   const filters: { [key: string]: any } = { ...req.query };
   delete filters.page;
   delete filters.limit;
   delete filters.sort;
   delete filters.fields;
+  delete filters.search;
+
+  if (search) {
+    filters.$text = { $search: search as string };
+  }
 
   const pageNum = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
   const skip = (pageNum - 1) * limitNum;
 
-  const cacheKey = `courses:page=${pageNum}&limit=${limitNum}&sort=${sort || ''}&fields=${fields || ''}`;
+  const cacheKey = `courses:page=${pageNum}&limit=${limitNum}&sort=${sort || ''}&fields=${fields || ''}&search=${search || ''}`;
 
   try {
     if (redisClient.isReady) {
@@ -36,10 +41,7 @@ export const listCourses = async (req: Request, res: Response) => {
       }
     }
 
-    // --- FIX STARTS HERE ---
-    // 2. Explicitly type the 'query' variable to prevent type conflicts
     let query: Query<any, any> = Course.find(filters);
-    // --- FIX ENDS HERE ---
 
     // Sorting Logic
     if (sort) {
@@ -56,7 +58,7 @@ export const listCourses = async (req: Request, res: Response) => {
     }
 
     query = query.skip(skip).limit(limitNum);
-    
+
     const courses = await query;
     const totalRecords = await Course.countDocuments(filters);
     const totalPages = Math.ceil(totalRecords / limitNum);
@@ -125,7 +127,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
     const course = await Course.create({ ...req.body, instructorId: req.user!.id });
     if (redisClient.isReady) {
       try {
-        await redisClient.del('courses:*'); 
+        await redisClient.del('courses:*');
       } catch (e) {
         console.error('Failed to clear course cache', e);
       }
