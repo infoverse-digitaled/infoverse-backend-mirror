@@ -7,7 +7,7 @@ import { HttpError } from '../utils/httpError';
 // Ensure JWT_SECRET is pulled from environment variables.
 // This is a critical security check that will crash the app if the secret is missing,
 // preventing the application from running in an insecure state.
-const JWT_SECRET = process.env.JWT_SECRET;
+const {JWT_SECRET} = process.env || 'secret';
 if (!JWT_SECRET) {
   // This error will be thrown during application startup if the .env file is not
   // correctly loaded or if the JWT_SECRET is not defined.
