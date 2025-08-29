@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+import config from '../config';
 
 interface AuthenticatedRequest extends Request {
   user?: { id: string; role: string };
@@ -19,7 +18,7 @@ export const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: 
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
+    const decoded = jwt.verify(token, config.jwt.secret) as { userId: string; role: string };
     req.user = { id: decoded.userId, role: decoded.role }; // Attach user info to request
     next();
   } catch (err) {

@@ -1,18 +1,9 @@
 import express from 'express';
-import cors from 'cors';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import ratelimiter from 'express-rate-limit';
-import statusMonitor from 'express-status-monitor';
 
 const setupMiddleware = (app: express.Application) => {
-  app.use(statusMonitor());
-  app.use(
-    cors({
-      origin: process.env.FRONTEND_URL,
-      credentials: true,
-    }),
-  );
   app.use(express.json());
   app.use(morgan('dev'));
   app.use(helmet());

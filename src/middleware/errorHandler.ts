@@ -1,6 +1,7 @@
 import { ErrorRequestHandler } from 'express';
 import { HttpError } from '../utils/httpError';
 import logger from '../utils/logger';
+import config from '../config';
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   logger.error(err.message, { stack: err.stack });
@@ -15,7 +16,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   // For production, send a generic message
-  if (process.env.NODE_ENV === 'production') {
+  if (config.env === 'production') {
     return res.status(500).json({
       error: {
         code: 'INTERNAL_SERVER_ERROR',

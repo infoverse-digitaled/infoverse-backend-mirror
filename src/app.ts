@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import path from 'path';
 import statusMonitor from 'express-status-monitor';
 import compression from 'compression';
+import path from 'path';
 import cors from 'cors';
+import config from './config';
 import errorHandler from './middleware/errorHandler';
 import setupMiddleware from './middleware/index';
 import setRoutes from './routes/setRoutes';
@@ -12,8 +12,6 @@ import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
-
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 
@@ -25,7 +23,7 @@ app.use(compression());
 
 // Configure CORS to allow requests from the Next.js frontend URL.
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: config.frontendUrl,
   credentials: true
 }));
 
@@ -33,10 +31,8 @@ app.use(cors({
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // MongoDB connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/infoverseDB';
-
 mongoose
-  .connect(MONGO_URI)
+  .connect(config.mongo.uri)
   .then(() => {
     logger.info('Connected to MongoDB');
   })

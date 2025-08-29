@@ -1,8 +1,9 @@
 import express from 'express';
 import { createClient } from 'redis';
+import config from './config';
 
 export const redisClient = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
+  url: config.redis.url,
 });
 
 redisClient.on('error', (err) => console.error('Redis Client Error', err));
@@ -17,7 +18,7 @@ const connectRedis = async () => {
 };
 
 const startServer = (app: express.Application) => {
-  const PORT = process.env.PORT || 5000;
+  const PORT = config.port;
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     connectRedis();

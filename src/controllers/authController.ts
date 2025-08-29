@@ -3,16 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import { HttpError } from '../utils/httpError';
-
-// Ensure JWT_SECRET is pulled from environment variables.
-// This is a critical security check that will crash the app if the secret is missing,
-// preventing the application from running in an insecure state.
-const {JWT_SECRET} = process.env || 'secret';
-if (!JWT_SECRET) {
-  // This error will be thrown during application startup if the .env file is not
-  // correctly loaded or if the JWT_SECRET is not defined.
-  throw new Error('JWT_SECRET must be defined in the environment variables');
-}
+import config from '../config';
 
 /**
  * Handles user registration.
@@ -68,14 +59,14 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
     
     // Create a JSON Web Token with the user's ID and role, expiring in 7 days.
-    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
 
     // Set the JWT as a secure, HTTP-only cookie.
     // The `httpOnly` flag prevents client-side scripts from accessing the cookie,
     // and the `secure` flag ensures the cookie is only sent over HTTPS in production.
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: config.env === 'production',
       sameSite: 'strict', // Protects against CSRF attacks.
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds.
     });
