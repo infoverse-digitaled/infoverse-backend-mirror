@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { helloController } from '../controllers';
 import { authenticateJWT } from '../middleware/authMiddleware';
+import authRouter from './auth';
 import courseRouter from './courseRoutes';
 import enrollmentRouter from './enrollmentRoutes';
 import userRouter from './userRoutes';
@@ -18,6 +19,7 @@ router.get('/profile', authenticateJWT, (req, res) => {
   });
 });
 
+router.use('/auth', authRouter);
 router.use('/courses', courseRouter, reviewRouter, enrollmentRouter);
 router.use('/users', userRouter);
 router.use('/admin', adminRouter);

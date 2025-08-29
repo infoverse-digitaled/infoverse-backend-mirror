@@ -2,17 +2,16 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
+import statusMonitor from 'express-status-monitor';
+import compression from 'compression';
+import cors from 'cors';
 import errorHandler from './middleware/errorHandler';
 import setupMiddleware from './middleware/index';
 import setRoutes from './routes/setRoutes';
-import authRoutes from './routes/auth';
 import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
-import statusMonitor from 'express-status-monitor';
 import logger from './utils/logger';
-import compression from 'compression';
-import cors from 'cors';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -53,8 +52,6 @@ setupMiddleware(app);
 // Apply the general rate limiter to all routes starting with /api/v1
 app.use('/api/v1', apiLimiter);
 
-// Routes for version 1
-app.use('/api/v1/auth', authRoutes);
 setRoutes(app);
 
 // Add a health check endpoint for simple uptime checks.
