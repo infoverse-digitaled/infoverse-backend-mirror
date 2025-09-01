@@ -20,7 +20,7 @@ import { isInstructor } from '../middleware/roles/isInstructor';
 const enrollmentRouter = express.Router();
 /**
  * @swagger
- * /api/courses/{courseId}/enroll:
+ * /api/v1/courses/{courseId}/enroll:
  *   post:
  *     summary: Enroll the authenticated user in a course
  *     tags: [Enrollments]
@@ -44,7 +44,7 @@ enrollmentRouter.post('/:courseId/enroll', authenticateJWT, enrollInCourse);
 
 /**
  * @swagger
- * /api/courses/{courseId}/enrollments:
+ * /api/v1/courses/{courseId}/enrollments:
  *   get:
  *     summary: Get all enrollments for a course (instructor only)
  *     tags: [Enrollments]
@@ -68,7 +68,7 @@ enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, ge
 
 /**
  * @swagger
- * /api/enrollments/{enrollmentId}:
+ * /api/v1/enrollments/{enrollmentId}:
  *   put:
  *     summary: Update an enrollment status (instructor only)
  *     tags: [Enrollments]
@@ -109,7 +109,7 @@ enrollmentRouter.put(
 
 /**
  * @swagger
- * /api/courses/{courseId}/drop:
+ * /api/v1/courses/{courseId}/drop:
  *   delete:
  *     summary: Drop a course the user is enrolled in
  *     tags: [Enrollments]

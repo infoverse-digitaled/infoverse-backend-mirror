@@ -22,7 +22,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/admin/users:
+ * /api/v1/admin/users:
  *   get:
  *     summary: Get all users
  *     tags: [Admin]
@@ -39,7 +39,7 @@ const router = Router();
 router.get('/users', authenticateJWT, isAdmin, getAllUsers);
 /**
  * @swagger
- * /api/admin/users/{id}:
+ * /api/v1/admin/users/{id}:
  *   get:
  *     summary: Get a user by ID
  *     tags: [Admin]
@@ -64,7 +64,7 @@ router.get('/users', authenticateJWT, isAdmin, getAllUsers);
 router.get('/users/:id', authenticateJWT, isAdmin, getUserById);
 /**
  * @swagger
- * /api/admin/users:
+ * /api/v1/admin/users:
  *   post:
  *     summary: Create a new user
  *     tags: [Admin]
@@ -116,7 +116,7 @@ router.get('/users/:id', authenticateJWT, isAdmin, getUserById);
 router.put('/users', authenticateJWT, isAdmin, createUser);
 /**
  * @swagger
- * /api/admin/users/{id}:
+ * /api/v1/admin/users/{id}:
  *   delete:
  *     summary: Delete a user
  *     tags: [Admin]
@@ -141,7 +141,7 @@ router.put('/users', authenticateJWT, isAdmin, createUser);
 router.delete('/users/:id', authenticateJWT, isAdmin, deleteUser);
 /**
  * @swagger
- * /api/admin/courses:
+ * /api/v1/admin/courses:
  *   get:
  *     summary: Get all courses
  *     tags: [Admin]
@@ -167,7 +167,7 @@ router.delete('/users/:id', authenticateJWT, isAdmin, deleteUser);
 
 /**
  * @swagger
- * /api/admin/courses/{id}:
+ * /api/v1/admin/courses/{id}:
  *   get:
  *     summary: Get a course by ID
  *     tags: [Admin]
@@ -199,7 +199,7 @@ router.delete('/users/:id', authenticateJWT, isAdmin, deleteUser);
 
 /**
  * @swagger
- * /api/admin/courses:
+ * /api/v1/admin/courses:
  *   post:
  *     summary: Create a new course
  *     tags: [Admin]
@@ -245,7 +245,7 @@ router.delete('/users/:id', authenticateJWT, isAdmin, deleteUser);
 
 /**
  * @swagger
- * /api/admin/courses/{id}:
+ * /api/v1/admin/courses/{id}:
  *   delete:
  *     summary: Delete a course
  *     tags: [Admin]

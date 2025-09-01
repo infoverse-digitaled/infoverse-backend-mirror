@@ -20,7 +20,7 @@ const userRouter = express.Router();
 
 /**
  * @swagger
- * /api/users/me/profile:
+ * /api/v1/users/me/profile:
  *   get:
  *     summary: Get current user's profile
  *     tags: [Users]
@@ -47,7 +47,7 @@ userRouter.get('/me/profile', authenticateJWT, getUserProfile);
 
 /**
  * @swagger
- * /api/users/me/profile:
+ * /api/v1/users/me/profile:
  *   put:
  *     summary: Update current user's profile
  *     tags: [Users]
@@ -82,7 +82,7 @@ userRouter.put(
 
 /**
  * @swagger
- * /api/users/me/enrollments:
+ * /api/v1/users/me/enrollments:
  *   get:
  *     summary: Get all courses the user is enrolled in
  *     tags: [Users]
@@ -112,7 +112,7 @@ userRouter.put(
 userRouter.get('/me/enrollments', authenticateJWT, getUserEnrollments);
 /**
  * @swagger
- * /api/users/me/reviews:
+ * /api/v1/users/me/reviews:
  *   get:
  *     summary: Get current user's reviews
  *     tags: [Users]
