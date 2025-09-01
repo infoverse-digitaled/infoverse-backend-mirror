@@ -51,10 +51,6 @@ const validateConfig = (): AppConfig => {
     throw new Error('Missing required environment variable: JWT_SECRET');
   }
 
-  if (!REDIS_URL) {
-    // We will default to a standard local Redis URL if not provided
-    console.warn('Warning: REDIS_URL not set. Defaulting to redis://localhost:6379');
-  }
   const redisPort = REDIS_PORT ? parseInt(REDIS_PORT, 10) : 6379;
   if (Number.isNaN(redisPort)) {
     // We will default to a standard local Redis URL if not provided
@@ -68,15 +64,22 @@ const validateConfig = (): AppConfig => {
   }
 
   // --- Return the validated and typed config object ---
+  const env = NODE_ENV || 'development';
+  const redisUrl = env === 'development' ? 'redis://localhost:6379' : REDIS_URL;
+
+  if (!redisUrl) {
+    throw new Error('Missing required environment variable: REDIS_URL (for production)');
+  }
+
   return {
-    env: NODE_ENV || 'development',
+    env,
     port,
     logLevel: LOG_LEVEL || 'info',
     mongo: {
       uri: MONGO_URI,
     },
     redis: {
-      url: REDIS_URL || 'redis://localhost:6379',
+      url: redisUrl,
       port: redisPort,
     },
     jwt: {

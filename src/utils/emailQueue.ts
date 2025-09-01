@@ -2,7 +2,7 @@ import { Queue } from 'bullmq';
 import config from '../config';
 // Use the same Redis connection details as your caching setup
 const redisConnection = {
-  host: config.redis.url,
+  url: config.redis.url,
   port: config.redis.port,
 };
 // Create and export the queue for sending emails

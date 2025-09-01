@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import User from '../models/User';
 import { HttpError } from '../utils/httpError';
 import config from '../config';
@@ -59,7 +59,10 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
     
     // Create a JSON Web Token with the user's ID and role, expiring in 7 days.
-    const token = jwt.sign({ userId: user._id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+    const options: SignOptions = {
+      expiresIn: config.jwt.expiresIn as any,
+    };
+    const token = jwt.sign({ userId: user._id, role: user.role }, config.jwt.secret, options);
 
     // Set the JWT as a secure, HTTP-only cookie.
     // The `httpOnly` flag prevents client-side scripts from accessing the cookie,
