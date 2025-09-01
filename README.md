@@ -1,77 +1,183 @@
-# Backend
+# InfoVerse Backend
 
-## InfoVerse Backend Development
+This is the backend for InfoVerse's Learning Management System. It is a Node.js application written in TypeScript, using Express.js as the web framework.
+
+## Features
+
+*   **User Authentication:** JWT-based authentication with roles (student, instructor, admin).
+*   **Course Management:** Create, read, update, and delete courses.
+*   **Enrollment System:** Users can enroll in courses.
+*   **Review System:** Users can leave reviews and ratings for courses.
+*   **Admin Panel:** Admins can manage users and courses.
+
+## Project Structure
 
 <details>
-<summary>📁 Project Structure</summary>
+<summary> Project Structure</summary>
 
 ```bash
-express-server-template
+.
 ├── src
-│   ├── app.ts            # Entry point of the application
-│   ├── routes            # Contains route definitions
-│   │   └── index.ts      # Main routes file
-│   ├── controllers       # Contains request handlers
-│   │   └── index.ts      # Main controller file
-│   └── middleware        # Contains middleware functions
-│       └── logger.ts     # Logger middleware
-├── .env.example          # env placeholders
-├── package.json          # NPM configuration file
+│   ├── app.ts            # Application entry point
+│   ├── server.ts         # Server setup
+│   ├── config            # Configuration files
+│   ├── controllers       # Request handlers
+│   ├── middleware        # Express middleware
+│   ├── models            # Mongoose data models
+│   ├── routes            # API route definitions
+│   ├── tests             # Test files
+│   └── utils             # Utility functions
+├── .env.example          # Environment variable placeholders
+├── package.json          # NPM configuration
 ├── tsconfig.json         # TypeScript configuration
 └── README.md             # Project documentation
-````
+```
 
 </details>
 
----
+## API Documentation
+
+The API is versioned with a base path of `/api/v1`.
 
 <details>
-<summary>🚀 Getting Started</summary>
+<summary>Authentication Endpoints (`/auth`)</summary>
 
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd backend
-```
-
----
-
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
----
-
-### 3. Run the application
-
-* **Development mode (auto-reloads on changes):**
-
-  ```bash
-  npm run nodemon
-  ```
-
-* **Development mode (manual restart required):**
-
-  ```bash
-  npm run dev
-  ```
-
-* **Production build:**
-
-  ```bash
-  npm run build
-  npm start
-  ```
+*   **`POST /register`**: Register a new user.
+    *   **Request Body:** `{ "name": "John Doe", "email": "john@example.com", "password": "password123" }`
+    *   **Response:** `{ "message": "User registered successfully" }`
+*   **`POST /login`**: Login a user.
+    *   **Request Body:** `{ "email": "john@example.com", "password": "password123" }`
+    *   **Response:** `{ "token": "JWT_TOKEN" }`
 
 </details>
 
----
+<details>
+<summary>Course Endpoints (`/courses`)</summary>
+
+*   **`GET /`**: Get a paginated list of courses.
+*   **`GET /{id}`**: Get a course by ID.
+*   **`POST /`**: Create a new course (requires instructor role).
+*   **`PUT /{id}`**: Update a course (requires instructor role).
+*   **`DELETE /{id}`**: Delete a course (requires instructor role).
+
+</details>
 
 <details>
-<summary>🌐 Usage</summary>
+<summary>Review Endpoints (`/courses/{courseId}/reviews`)</summary>
+
+*   **`GET /`**: Get all reviews for a course.
+*   **`POST /`**: Post a review for a course (requires student role).
+
+</details>
+
+<details>
+<summary>Enrollment Endpoints (`/courses`)</summary>
+
+*   **`POST /{courseId}/enroll`**: Enroll in a course.
+*   **`GET /{courseId}/enrollments`**: Get all enrollments for a course (requires instructor role).
+*   **`PUT /enrollments/{enrollmentId}`**: Update enrollment status (requires instructor role).
+*   **`DELETE /{courseId}/drop`**: Drop a course.
+
+</details>
+
+<details>
+<summary>User Endpoints (`/users`)</summary>
+
+*   **`GET /me/profile`**: Get the current user's profile.
+*   **`PUT /me/profile`**: Update the current user's profile.
+*   **`GET /me/enrollments`**: Get all courses the user is enrolled in.
+*   **`GET /me/reviews`**: Get the current user's reviews.
+
+</details>
+
+<details>
+<summary>Admin Endpoints (`/admin`)</summary>
+
+*   **`GET /users`**: Get all users.
+*   **`GET /users/{id}`**: Get a user by ID.
+*   **`PUT /users`**: Create a new user.
+*   **`DELETE /users/{id}`**: Delete a user.
+*   **`GET /courses`**: Get all courses.
+*   **`GET /courses/{id}`**: Get a course by ID.
+*   **`POST /courses`**: Create a new course.
+*   **`DELETE /courses/{id}`**: Delete a course.
+
+</details>
+
+## Data Models
+
+<details>
+<summary>Data Models</summary>
+
+*   **User:**
+    *   `name` (String)
+    *   `email` (String, unique)
+    *   `passwordHash` (String)
+    *   `role` (String, enum: `student`, `instructor`, `admin`)
+*   **Course:**
+    *   `title` (String)
+    *   `description` (String)
+    *   `instructorId` (ObjectId, ref: `User`)
+    *   `thumbnailUrl` (String)
+    *   `price` (Number)
+    *   `syllabus` (Array of objects)
+*   **Enrollment:**
+    *   `userId` (ObjectId, ref: `User`)
+    *   `courseId` (ObjectId, ref: `Course`)
+    *   `enrolledAt` (Date)
+    *   `status` (String, enum: `active`, `completed`, `dropped`)
+*   **Review:**
+    *   `userId` (ObjectId, ref: `User`)
+    *   `courseId` (ObjectId, ref: `Course`)
+    *   `rating` (Number)
+    *   `comment` (String)
+
+</details>
+
+## Getting Started
+
+<details>
+<summary>Getting Started</summary>
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd backend
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Set up environment variables:**
+    Create a `.env` file in the root of the project and add the following variables:
+    ```
+    PORT=5000
+    MONGO_URI=<your_mongodb_uri>
+    JWT_SECRET=<your_jwt_secret>
+    FRONTEND_URL=<your_frontend_url>
+    REDIS_URL=<your_redis_url>
+    ```
+4.  **Run the application:**
+    *   **Development mode (auto-reloads on changes):**
+        ```bash
+        npm run nodemon
+        ```
+    *   **Development mode (manual restart required):**
+        ```bash
+        npm run dev
+        ```
+    *   **Production build:**
+        ```bash
+        npm run build
+        npm start
+        ```
+
+</details>
+
+## Usage
+
+<details>
+<summary>Usage</summary>
 
 Once the server is running, access it at:
 
@@ -80,10 +186,10 @@ Once the server is running, access it at:
 
 </details>
 
----
+## Committing Changes
 
 <details>
-<summary>✅ Committing Changes</summary>
+<summary>Committing Changes</summary>
 
 This project uses [**Commitizen**](https://github.com/commitizen/cz-cli) to standardize commit messages.
 
@@ -97,12 +203,11 @@ Follow the interactive prompts to format your message correctly.
 
 </details>
 
----
+## Environment Setup with Dotenv Vault
 
 <details>
-<summary>🔐 Environment Setup with Dotenv Vault (click to expand)</summary>
+<summary>Environment Setup with Dotenv Vault</summary>
 
-<br>
 
 We use [Dotenv Vault](https://dotenv.org/) to securely manage and share environment variables across the team.
 
@@ -170,18 +275,17 @@ Make sure `.env` is in `.gitignore`. It should **never** be committed:
 ```
 </details>
 
----
+## Code Linting
 
 <details>
-<summary>🧹 Code Linting</summary>
+<summary>Code Linting</summary>
 
-<br>
 
 We use **ESLint** with the **Airbnb + Prettier** configuration to maintain consistent code quality and style across the project.
 
 ---
 
-### 🔧 Run Lint Check
+###  Run Lint Check
 
 Check your TypeScript files for linting issues:
 
@@ -191,7 +295,7 @@ npx eslint . --ext .ts
 
 ---
 
-### 🛠 Auto-fix Lint Issues
+###  Auto-fix Lint Issues
 
 Automatically fix fixable lint problems:
 
@@ -201,7 +305,7 @@ npx eslint . --ext .ts --fix
 
 ---
 
-### 📦 Optional: Add Scripts to `package.json`
+###  Optional: Add Scripts to `package.json`
 
 To simplify the process, you can add these scripts:
 
@@ -221,7 +325,7 @@ npm run lint:fix
 
 ---
 
-### 💡 VS Code Tip
+###  VS Code Tip
 
 Set up VS Code to auto-format and lint on save:
 
@@ -242,7 +346,5 @@ Set up VS Code to auto-format and lint on save:
   "eslint.validate": ["javascript", "typescript"]
 }
 ```
-
----
 
 </details>
