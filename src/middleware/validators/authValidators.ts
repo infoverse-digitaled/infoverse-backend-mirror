@@ -1,7 +1,7 @@
 import { body } from 'express-validator';
 
 // Define validation and sanitization rules for authentication
-export const authValidationRules = [
+export const loginValidationRules = [
   // Validate and sanitize the name field
   body('name')
     .notEmpty().withMessage('Name is required')
@@ -17,6 +17,12 @@ export const authValidationRules = [
   // Validate and sanitize the password field
   body('password')
     .notEmpty().withMessage('Password is required')
+];
+
+export const signupValidationRules = [
+  ...loginValidationRules,
+  // Validate and sanitize the password field
+  body('password')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long.') // <-- Updated to min length of 8
     .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter.')
     .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter.')

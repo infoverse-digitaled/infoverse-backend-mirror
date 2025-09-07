@@ -17,7 +17,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) => {
-  const { courseId } = req.body;
+  const { courseId } = req.params;
   const userId = req.user!.id;
 
   if (!mongoose.Types.ObjectId.isValid(courseId)) {
@@ -109,8 +109,8 @@ export const updateEnrollmentStatus = async (req: Request, res: Response) => {
 
     if (redisClient.isReady) {
       try {
-        await redisClient.del(`userEnrollments:${(enrollment as any).userId}`);
-        await redisClient.del(`courseEnrollments:${(enrollment as any).courseId}`);
+        await redisClient.del(`userEnrollments:${enrollment.userId}`);
+        await redisClient.del(`courseEnrollments:${enrollment.courseId}`);
       } catch (e) {
         console.error('Failed to clear enrollment cache', e);
       }
