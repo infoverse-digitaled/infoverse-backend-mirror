@@ -20,6 +20,7 @@ import {
   updateCourseValidationRules,
 } from '../middleware/validators/courseValidators';
 import validateRequest from '../middleware/validators/validateRequest';
+import { isAdmin } from '../middleware/roles/isAdmin';
 
 const courseRouter = express.Router();
 
@@ -163,6 +164,7 @@ courseRouter.put(
   '/:id',
   authenticateJWT,
   isInstructor,
+  isAdmin,
   updateCourseValidationRules,
   validateRequest,
   updateCourse,

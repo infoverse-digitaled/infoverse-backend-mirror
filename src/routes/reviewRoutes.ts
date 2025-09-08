@@ -1,6 +1,10 @@
 import { Router } from 'express';
-import { body, param } from 'express-validator';
-import { getCourseReviews, postReview } from '../controllers/reviewController';
+import { param } from 'express-validator';
+import {
+  getCourseReviews,
+  postReview,
+  deleteOwnReview,
+} from '../controllers/reviewController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 import { isStudent } from '../middleware/roles/isStudent';
 import { reviewValidationRules } from '../middleware/validators/reviewValidators';
@@ -101,16 +105,6 @@ const router = Router();
  *     responses:
  *       201:
  *         description: Review posted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Review posted successfully"
- *                 data:
- *                   $ref: '#/components/schemas/Review'
  *       400:
  *         description: Validation error
  *       401:
@@ -121,9 +115,6 @@ const router = Router();
 router
   .route('/:courseId/reviews')
   .get(
-    [
-      param('courseId').isMongoId().withMessage('Invalid course ID format'),
-    ],
     validateRequest,
     getCourseReviews
   )
@@ -134,5 +125,47 @@ router
     validateRequest,
     postReview
   );
+
+/**
+ * @swagger
+ * /api/v1/courses/{courseId}/reviews/{reviewId}:
+ *   delete:
+ *     summary: Delete a review for a course (student owner only)
+ *     tags: [Reviews]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema: 
+ *           type: string
+ *         description: The ID of the course (for route consistency)
+ *       - in: path
+ *         name: reviewId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the review to delete
+ *     responses:
+ *       200:
+ *         description: Review deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - user is not the owner
+ *       404:
+ *         description: Review not found
+ */
+router.delete(
+  '/:courseId/reviews/:reviewId',
+  authenticateJWT,
+  isStudent,
+  [
+    param('courseId').isMongoId().withMessage('Invalid course ID format'),
+  ],
+  validateRequest,
+  deleteOwnReview,
+);
 
 export default router;

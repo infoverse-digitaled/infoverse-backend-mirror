@@ -76,6 +76,35 @@ export const deleteUser = async (req: Request, res: Response) => {
   }
 };
 
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const { password, ...otherFields } = req.body;
+    if (password) {
+      otherFields.passwordHash = await bcrypt.hash(password, 10);
+    }
+    if (otherFields.email) {
+      const existingUser = await User.findOne({ email: otherFields.email, _id: { $ne: req.params.id } });
+      if (existingUser) {
+        throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(req.params.id, otherFields, { new: true });
+    if (!user) {
+      throw new HttpError(404, 'User not found', 'NOT_FOUND');
+    }
+
+    if (redisClient.isReady) {
+      await redisClient.del(`user:${req.params.id}`);
+      await redisClient.del('users');
+    }
+    res.status(200).json({ message: 'User updated successfully', data: user });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};
+
 export const getAllCourses = async (_req: Request, res: Response) => {
   try {
     const courses = await Course.find();

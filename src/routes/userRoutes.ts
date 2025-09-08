@@ -7,7 +7,7 @@
 
 import express from 'express';
 import validateRequest from '../middleware/validators/validateRequest';
-import { userupdateValidationRules } from '../middleware/validators/userValidators';
+import { userUpdateValidationRules } from '../middleware/validators/userValidators';
 import {
   getUserProfile,
   updateUserProfile,
@@ -49,7 +49,7 @@ userRouter.get('/me/profile', authenticateJWT, getUserProfile);
  * @swagger
  * /api/v1/users/me/profile:
  *   put:
- *     summary: Update current user's profile
+ *     summary: Update current user's profile (and optionally change password)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -62,20 +62,30 @@ userRouter.get('/me/profile', authenticateJWT, getUserProfile);
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "John Doe"
  *               email:
  *                 type: string
+ *                 example: "john.doe@example.com"
+ *               currentPassword:
+ *                 type: string
+ *                 description: Required only when changing the password.
+ *                 example: "currentSecurePassword123"
+ *               newPassword:
+ *                 type: string
+ *                 description: Required only when changing the password. Must be at least 8 characters.
+ *                 example: "newSecurePassword456"
  *     responses:
  *       200:
- *         description: User profile updated
+ *         description: User profile updated successfully
  *       400:
- *         description: Validation error
+ *         description: Validation error (e.g., missing fields for password change)
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized (e.g., incorrect currentPassword)
  */
 userRouter.put(
   '/me/profile',
   authenticateJWT,
-  userupdateValidationRules,
+  userUpdateValidationRules,
   validateRequest,
   updateUserProfile,
 );

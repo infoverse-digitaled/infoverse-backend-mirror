@@ -63,3 +63,57 @@ export const postReview = async (req: AuthenticatedRequest, res: Response) => {
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
 };
+
+export const deleteReview = async (req: Request, res: Response) => {
+  const { reviewId } = req.params;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      throw new HttpError(400, 'Invalid review ID', 'INVALID_ID');
+    }
+    const review = await Review.findByIdAndDelete(reviewId);
+    if (!review) {
+      throw new HttpError(404, 'Review not found', 'NOT_FOUND');
+    }
+
+    if (redisClient.isReady) {
+      await redisClient.del(`reviews:${review.courseId}`);
+    }
+
+    res.status(200).json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};
+
+export const deleteOwnReview = async (req: AuthenticatedRequest, res: Response) => {
+  const { reviewId } = req.params;
+  const userId = req.user!.id;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      throw new HttpError(400, 'Invalid review ID', 'INVALID_ID');
+    }
+
+    const review = await Review.findById(reviewId);
+
+    if (!review) {
+      throw new HttpError(404, 'Review not found', 'NOT_FOUND');
+    }
+
+    if (review.userId !== userId) {
+      throw new HttpError(403, 'Forbidden: You can only delete your own reviews', 'FORBIDDEN');
+    }
+
+    await Review.findByIdAndDelete(reviewId);
+
+    if (redisClient.isReady) {
+      await redisClient.del(`reviews:${review.courseId}`);
+    }
+
+    res.status(200).json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};

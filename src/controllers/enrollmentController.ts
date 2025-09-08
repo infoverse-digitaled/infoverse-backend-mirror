@@ -152,3 +152,33 @@ export const dropCourse = async (req: AuthenticatedRequest, res: Response) => {
     }
   }
 };
+
+export const getUserEnrollments = async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const cacheKey = `userEnrollments:${userId}`;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
+
+    if (redisClient.isReady) {
+      const cachedEnrollments = await redisClient.get(cacheKey);
+      if (cachedEnrollments) {
+        return res.status(200).json(JSON.parse(cachedEnrollments));
+      }
+    }
+
+    const enrollments = await Enrollment.find({ userId }).populate('courseId');
+    const response = { data: enrollments };
+
+    if (redisClient.isReady) {
+      await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+    }
+
+    res.status(200).json(response);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};
