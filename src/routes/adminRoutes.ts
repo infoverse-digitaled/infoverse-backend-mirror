@@ -120,7 +120,7 @@ router.get('/users/:id', authenticateJWT, isAdmin, getUserById);
  *       409:
  *         description: User with this email already exists
  */
-router.put('/users', authenticateJWT, isAdmin, createUser);
+router.post('/users', authenticateJWT, isAdmin, createUser);
 /**
  * @swagger
  * /api/v1/admin/users/{id}:
