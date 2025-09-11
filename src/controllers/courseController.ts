@@ -3,6 +3,7 @@ import mongoose, { Query } from 'mongoose'; // <-- 1. Import the Query type
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
+import { successResponse } from '../middleware/response';
 
 // Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
@@ -37,7 +38,8 @@ export const listCourses = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       const cachedCourses = await redisClient.get(cacheKey);
       if (cachedCourses) {
-        return res.status(200).json(JSON.parse(cachedCourses));
+        const parsedCache = JSON.parse(cachedCourses);
+        return successResponse(res, parsedCache.data, 'Courses retrieved from cache');
       }
     }
 
@@ -77,7 +79,7 @@ export const listCourses = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
     }
-    res.status(200).json(result);
+    successResponse(res, result, 'Courses retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -94,7 +96,8 @@ export const getCourseById = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       const cachedCourse = await redisClient.get(cacheKey);
       if (cachedCourse) {
-        return res.status(200).json(JSON.parse(cachedCourse));
+        const parsedCache = JSON.parse(cachedCourse);
+        return successResponse(res, parsedCache.data, 'Course retrieved from cache');
       }
     }
 
@@ -111,7 +114,7 @@ export const getCourseById = async (req: Request, res: Response) => {
         console.error('Failed to cache course', e);
       }
     }
-    res.status(200).json(response);
+    successResponse(res, course, 'Course retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -132,7 +135,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
         console.error('Failed to clear course cache', e);
       }
     }
-    res.status(201).json({ data: course });
+    successResponse(res, course, 'Course created successfully', 201);
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -156,7 +159,7 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response) => 
         console.error('Failed to clear course cache', e);
       }
     }
-    res.status(200).json({ data: course });
+    successResponse(res, course, 'Course updated successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -181,7 +184,7 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response) => 
         console.error('Failed to clear course cache', e);
       }
     }
-    res.status(200).json({ message: 'Course deleted' });
+    successResponse(res, [], 'Course deleted successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

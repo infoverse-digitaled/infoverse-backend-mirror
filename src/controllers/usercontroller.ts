@@ -6,6 +6,7 @@ import Enrollment from '../models/Enrollment';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
+import { successResponse } from '../middleware/response';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -25,7 +26,8 @@ export const getUserProfile = async (req: AuthenticatedRequest, res: Response) =
     if (redisClient.isReady) {
       const cachedProfile = await redisClient.get(cacheKey);
       if (cachedProfile) {
-        return res.status(200).json(JSON.parse(cachedProfile));
+        const parsedCache = JSON.parse(cachedProfile);
+        return successResponse(res, parsedCache.data, 'Profile retrieved from cache');
       }
     }
 
@@ -34,15 +36,14 @@ export const getUserProfile = async (req: AuthenticatedRequest, res: Response) =
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
 
-    const response = { data: profile };
     if (redisClient.isReady) {
       try {
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: profile }));
       } catch (e) {
         console.error('Failed to cache user profile', e);
       }
     }
-    res.status(200).json(response);
+    successResponse(res, profile, 'Profile retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -93,7 +94,7 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
       await redisClient.del(`user:${userId}`);
     }
 
-    res.status(200).json({ message: 'Profile updated successfully', data: updatedProfile });
+    successResponse(res, updatedProfile, 'Profile updated successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -110,7 +111,8 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
     if (redisClient.isReady) {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
-        return res.status(200).json(JSON.parse(cachedReviews));
+        const parsedCache = JSON.parse(cachedReviews);
+        return successResponse(res, parsedCache.data, 'Reviews retrieved from cache');
       }
     }
 
@@ -119,15 +121,14 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
       throw new HttpError(404, 'No reviews found', 'NOT_FOUND');
     }
 
-    const response = { data: reviews };
     if (redisClient.isReady) {
       try {
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: reviews }));
       } catch (e) {
         console.error('Failed to cache user reviews', e);
       }
     }
-    res.status(200).json(response);
+    successResponse(res, reviews, 'Reviews retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -145,21 +146,21 @@ export const getUserEnrollments = async (req: AuthenticatedRequest, res: Respons
     if (redisClient.isReady) {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
-        return res.status(200).json(JSON.parse(cachedEnrollments));
+        const parsedCache = JSON.parse(cachedEnrollments);
+        return successResponse(res, parsedCache.data, 'Enrollments retrieved from cache');
       }
     }
 
     const enrollments = await Enrollment.find({ userId }).populate('courseId');
-    const response = { data: enrollments };
 
     if (redisClient.isReady) {
       try {
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: enrollments }));
       } catch (e) {
         console.error('Failed to cache user enrollments', e);
       }
     }
-    res.status(200).json(response);
+    successResponse(res, enrollments, 'Enrollments retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

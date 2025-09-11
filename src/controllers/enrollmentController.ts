@@ -5,6 +5,7 @@ import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
 import { emailQueue } from '../utils/emailQueue'; // Assuming you have a queue setup for sending emails
+import { successResponse } from '../middleware/response';
 
 // Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
@@ -57,10 +58,7 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
       console.error('Failed to clear enrollment cache', e);
     }
   }
-  res.status(201).json({
-    message: 'Enrolled successfully! A confirmation email is being sent.',
-    data: enrollment,
-  });
+  successResponse(res, enrollment, 'Enrolled successfully! A confirmation email is being sent.', 201);
 };
 
 export const getCourseEnrollments = async (req: Request, res: Response) => {
@@ -74,7 +72,8 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
-        return res.status(200).json(JSON.parse(cachedEnrollments));
+        const parsedCache = JSON.parse(cachedEnrollments);
+        return successResponse(res, parsedCache.data, 'Enrollments retrieved from cache');
       }
     }
 
@@ -88,7 +87,7 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
         console.error('Failed to cache course enrollments', e);
       }
     }
-    res.status(200).json(response);
+    successResponse(res, enrollments, 'Enrollments retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -97,10 +96,14 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
 
 export const updateEnrollmentStatus = async (req: Request, res: Response) => {
   const { enrollmentId } = req.params;
+  const { courseId } = req.params;
   const { status } = req.body;
   try {
     if (!mongoose.Types.ObjectId.isValid(enrollmentId)) {
       throw new HttpError(400, 'Invalid enrollment ID', 'INVALID_ID');
+    }
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
     }
     const enrollment = await Enrollment.findByIdAndUpdate(enrollmentId, { status }, { new: true });
     if (!enrollment) {
@@ -115,7 +118,7 @@ export const updateEnrollmentStatus = async (req: Request, res: Response) => {
         console.error('Failed to clear enrollment cache', e);
       }
     }
-    res.status(200).json({ data: enrollment });
+    successResponse(res, enrollment, 'Enrollment status updated successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -145,7 +148,7 @@ export const dropCourse = async (req: AuthenticatedRequest, res: Response) => {
         console.error('Failed to clear enrollment cache', e);
       }
     }
-    res.status(200).json({ message: 'Successfully dropped course' });
+    successResponse(res, [], 'Successfully dropped course');
   } catch (error) {
     if (error instanceof HttpError) {
       throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -165,7 +168,8 @@ export const getUserEnrollments = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
-        return res.status(200).json(JSON.parse(cachedEnrollments));
+        const parsedCache = JSON.parse(cachedEnrollments);
+        return successResponse(res, parsedCache.data, 'Enrollments retrieved from cache');
       }
     }
 
@@ -175,8 +179,7 @@ export const getUserEnrollments = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
     }
-
-    res.status(200).json(response);
+    successResponse(res, enrollments, 'Enrollments retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

@@ -4,6 +4,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import User from '../models/User';
 import { HttpError } from '../utils/httpError';
 import config from '../config';
+import { successResponse } from '../middleware/response';
 
 /**
  * Handles user registration.
@@ -24,9 +25,9 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     const passwordHash = await bcrypt.hash(password, 10);
     
     // Create the new user in the database.
-    await User.create({ name, email, passwordHash });
+    const newUser = await User.create({ name, email, passwordHash });
 
-    res.status(201).json({ message: 'User registered successfully' });
+    successResponse(res, newUser, 'User registered successfully', 201);
   } catch (err) {
     // Forward the error to the global error handler middleware.
     next(err);
@@ -43,7 +44,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     
     // Validate that both email and password were provided in the request body.
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required.' });
+      throw new HttpError(400, 'Email and password are required.', 'BAD_REQUEST');
     }
 
     // Find the user by their email.
@@ -71,15 +72,14 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       httpOnly: true,
       secure: config.env === 'production',
       sameSite: 'strict', // Protects against CSRF attacks.
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds.
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds.
     });
 
-    // Modified to include the token in the response body as per the API contract.
-    res.status(200).json({
-      message: 'Login successful',
-      token, // <-- This is the only change to your file.
+    const data = {
+      token,
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
-    });
+    };
+    successResponse(res, data, 'Login successful');
   } catch (err) {
     // Forward the error to the global error handler middleware.
     next(err);

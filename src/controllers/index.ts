@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
+import { successResponse } from '../middleware/response';
 
 export const helloController = (req: Request, res: Response) => {
-  res.send('Hello World!');
+  successResponse(res, [], 'Hello to the Infoverse!');
 };

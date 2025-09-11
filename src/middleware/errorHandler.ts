@@ -8,6 +8,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
   if (err instanceof HttpError) {
     return res.status(err.statusCode).json({
+      success: false,
       error: {
         code: err.code,
         message: err.message,
@@ -18,6 +19,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   // For production, send a generic message
   if (config.env === 'production') {
     return res.status(500).json({
+      success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Something went wrong',
@@ -27,6 +29,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
   // For development, send a detailed error
   res.status(500).json({
+    success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
       message: err.message,

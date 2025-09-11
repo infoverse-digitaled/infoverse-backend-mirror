@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
 import { redisClient } from '../server';
+import { successResponse } from '../middleware/response';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -23,22 +24,22 @@ export const getCourseReviews = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
-        return res.status(200).json(JSON.parse(cachedReviews));
+        const parsedCache = JSON.parse(cachedReviews);
+        return successResponse(res, parsedCache.data, 'Reviews retrieved from cache');
       }
     }
 
     const reviews = await Review.find({ courseId }).populate('userId', 'name');
-    const response = { data: reviews };
 
     if (redisClient.isReady) {
       try {
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: reviews }));
       } catch (e) {
         console.error('Failed to cache reviews', e);
       }
     }
 
-    res.status(200).json(response);
+    successResponse(res, reviews, 'Reviews retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -57,7 +58,7 @@ export const postReview = async (req: AuthenticatedRequest, res: Response) => {
       throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
     const review = await Review.create({ courseId, userId, rating, comment });
-    return res.status(201).json({ message: 'Review posted successfully', data: review });
+    return successResponse(res, review, 'Review posted successfully', 201);
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -79,7 +80,7 @@ export const deleteReview = async (req: Request, res: Response) => {
       await redisClient.del(`reviews:${review.courseId}`);
     }
 
-    res.status(200).json({ message: 'Review deleted successfully' });
+    successResponse(res, [], 'Review deleted successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -111,7 +112,7 @@ export const deleteOwnReview = async (req: AuthenticatedRequest, res: Response) 
       await redisClient.del(`reviews:${review.courseId}`);
     }
 
-    res.status(200).json({ message: 'Review deleted successfully' });
+    successResponse(res, [], 'Review deleted successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

@@ -4,21 +4,23 @@ import { redisClient } from '../../server';
 import User from '../../models/User';
 import Course from '../../models/Course';
 import { HttpError } from '../../utils/httpError';
+import { successResponse } from '../../middleware/response';
 
 export const getAllUsers = async (_req: Request, res: Response) => {
   try {
     if (redisClient.isReady) {
       const cachedUsers = await redisClient.get('users');
       if (cachedUsers) {
-        return res.status(200).json(JSON.parse(cachedUsers));
+        const parsedCache = JSON.parse(cachedUsers);
+        return successResponse(res, parsedCache.data, 'Users retrieved from cache');
       }
     }
 
     const users = await User.find();
     if (redisClient.isReady) {
-      await redisClient.setEx('users', 3600, JSON.stringify(users));
+      await redisClient.setEx('users', 3600, JSON.stringify({ data: users }));
     }
-    res.status(200).json({ data: users });
+    successResponse(res, users, 'Users retrieved successfully');
   } catch (error) {
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
@@ -29,14 +31,18 @@ export const getUserById = async (req: Request, res: Response) => {
     if (redisClient.isReady) {
       const cachedUser = await redisClient.get(`user:${req.params.id}`);
       if (cachedUser) {
-        res.status(200).json(cachedUser);
+        const parsedCache = JSON.parse(cachedUser);
+        return successResponse(res, parsedCache.data, 'User retrieved from cache');
       }
     }
     const user = await User.findById(req.params.id);
     if (!user) {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
-    res.status(200).json({ data: user });
+    if (redisClient.isReady) {
+      await redisClient.setEx(`user:${req.params.id}`, 3600, JSON.stringify({ data: user }));
+    }
+    successResponse(res, user, 'User retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -47,7 +53,7 @@ export const createUser = async (req: Request, res: Response) => {
   try {
     const { name, email, password, role } = req.body;
     if (!name || !email || !password || !role) {
-      return res.status(400).json({ message: 'Name, email, password, and role are required.' });
+      throw new HttpError(400, 'Name, email, password, and role are required.', 'BAD_REQUEST');
     }
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -56,7 +62,7 @@ export const createUser = async (req: Request, res: Response) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, passwordHash, role });
-    res.status(201).json({ message: 'User created successfully', data: user });
+    successResponse(res, user, 'User created successfully', 201);
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -69,7 +75,7 @@ export const deleteUser = async (req: Request, res: Response) => {
     if (!user) {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
-    res.status(200).json({ message: 'User deleted' });
+    successResponse(res, [], 'User deleted successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -98,7 +104,7 @@ export const updateUser = async (req: Request, res: Response) => {
       await redisClient.del(`user:${req.params.id}`);
       await redisClient.del('users');
     }
-    res.status(200).json({ message: 'User updated successfully', data: user });
+    successResponse(res, user, 'User updated successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -108,7 +114,7 @@ export const updateUser = async (req: Request, res: Response) => {
 export const getAllCourses = async (_req: Request, res: Response) => {
   try {
     const courses = await Course.find();
-    res.status(200).json({ data: courses });
+    successResponse(res, courses, 'Courses retrieved successfully');
   } catch (error) {
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
@@ -120,7 +126,7 @@ export const deleteCourse = async (req: Request, res: Response) => {
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
-    res.status(200).json({ message: 'Course deleted' });
+    successResponse(res, [], 'Course deleted successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

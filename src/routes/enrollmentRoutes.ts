@@ -17,7 +17,6 @@ import { updateEnrollmentValidationRules } from '../middleware/validators/enroll
 import { authenticateJWT } from '../middleware/authMiddleware';
 import { isInstructor } from '../middleware/roles/isInstructor';
 import { isStudent } from '../middleware/roles/isStudent';
-import { isAdmin } from '../middleware/roles/isAdmin';
 
 const enrollmentRouter = express.Router();
 /**
@@ -70,7 +69,7 @@ enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, ge
 
 /**
  * @swagger
- * /api/v1/enrollments/{enrollmentId}:
+ * /api/v1/courses/{courseId}/enrollments/{enrollmentId}:
  *   put:
  *     summary: Update an enrollment status (instructor only)
  *     tags: [Enrollments]
@@ -101,7 +100,7 @@ enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, ge
  *         description: Unauthorized
  */
 enrollmentRouter.put(
-  '/enrollments/:enrollmentId',
+  '/:courseId/enrollments/:enrollmentId',
   authenticateJWT,
   isStudent,
   updateEnrollmentValidationRules,
@@ -129,10 +128,6 @@ enrollmentRouter.put(
  *       401:
  *         description: Unauthorized
  */
-enrollmentRouter.delete('/:courseId/drop',
-  authenticateJWT,
-  isStudent,
-  dropCourse
-);
+enrollmentRouter.delete('/:courseId/drop', authenticateJWT, isStudent, dropCourse);
 
 export default enrollmentRouter;
