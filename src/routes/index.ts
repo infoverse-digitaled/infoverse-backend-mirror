@@ -20,7 +20,9 @@ router.get('/profile', authenticateJWT, (req, res) => {
 });
 
 router.use('/auth', authRouter);
-router.use('/courses', courseRouter, reviewRouter, enrollmentRouter);
+router.use('/courses', courseRouter);
+router.use('/courses', reviewRouter);
+router.use('/courses', enrollmentRouter);
 router.use('/users', userRouter);
 router.use('/admin', adminRouter);
 
