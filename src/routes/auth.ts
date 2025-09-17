@@ -6,8 +6,13 @@
  */
 
 import { Router } from 'express';
-import { register, login } from '../controllers/authController';
-import { loginValidationRules,signupValidationRules } from '../middleware/validators/authValidators';
+import { register, login, forgotPassword, resetPassword } from '../controllers/authController';
+import {
+  loginValidationRules,
+  signupValidationRules,
+  forgotPasswordValidationRules,
+  resetPasswordValidationRules,
+} from '../middleware/validators/authValidators';
 import validateRequest from '../middleware/validators/validateRequest';
 import { authLimiter } from '../middleware/rateLimiter';
 
@@ -67,5 +72,59 @@ router.post('/register', authLimiter, signupValidationRules, validateRequest, re
  *         description: Invalid credentials
  */
 router.post('/login', authLimiter, loginValidationRules, validateRequest, login);
+
+/**
+ * @swagger
+ * /api/v1/auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             email: john@example.com
+ *     responses:
+ *       200:
+ *         description: If a user with that email exists, a password reset token has been sent.
+ */
+router.post(
+  '/forgot-password',
+  authLimiter,
+  forgotPasswordValidationRules,
+  validateRequest,
+  forgotPassword);
+/**
+ * @swagger
+ * /api/v1/auth/reset-password/{token}:
+ *   patch:
+ *     summary: Reset the password
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The password reset token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             password: newStrongPassword123
+ *     responses:
+ *       200:
+ *         description: Password has been reset successfully.
+ *       400:
+ *         description: Token is invalid or has expired.
+ */
+router.patch(
+  '/reset-password/:token',
+  authLimiter,
+  resetPasswordValidationRules,
+  validateRequest,
+  resetPassword);
 
 export default router;

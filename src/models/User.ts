@@ -27,6 +27,8 @@ const UserSchema = new Schema<IUser>(
       default: 'student',
       required: true,
     },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
   },
   { timestamps: true },
 );

@@ -6,6 +6,8 @@ export interface IUser extends Document {
   passwordHash: string;
   name: string;
   role: 'student' | 'instructor';
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
