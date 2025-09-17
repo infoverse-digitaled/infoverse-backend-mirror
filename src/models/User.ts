@@ -1,4 +1,40 @@
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - email
+ *         - passwordHash
+ *         - name
+ *         - role
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: The auto-generated id of the user
+ *         email:
+ *           type: string
+ *           description: The email of the user
+ *         name:
+ *           type: string
+ *           description: The name of the user
+ *         role:
+ *           type: string
+ *           enum: [student, instructor, admin]
+ *           description: The role of the user
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: The date the user was created
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: The date the user was last updated
+ */
 import mongoose, { Schema } from 'mongoose';
+
 import { IUser } from './types';
 
 const UserSchema = new Schema<IUser>(

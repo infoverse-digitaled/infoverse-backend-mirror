@@ -46,7 +46,7 @@ const options = {
     ],
   },
   // The path to your API route files, using path.resolve for robustness
-  apis: [path.resolve(__dirname, './routes/*.ts')],
+  apis: [path.resolve(__dirname, './routes/*.ts'), path.resolve(__dirname, './models/*.ts')],
 };
 
 // Initialize swagger-jsdoc

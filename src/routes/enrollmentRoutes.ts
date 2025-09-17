@@ -81,6 +81,11 @@ enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, ge
  *         required: true
  *         schema:
  *           type: string
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
  *     requestBody:
  *       required: true
  *       content:

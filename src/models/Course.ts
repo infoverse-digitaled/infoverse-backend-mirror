@@ -1,4 +1,56 @@
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Course:
+ *       type: object
+ *       required:
+ *         - title
+ *         - description
+ *         - instructorId
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: The auto-generated id of the course
+ *         title:
+ *           type: string
+ *           description: The title of the course
+ *         description:
+ *           type: string
+ *           description: The description of the course
+ *         instructorId:
+ *           type: string
+ *           description: The id of the instructor
+ *         thumbnailUrl:
+ *           type: string
+ *           description: The URL of the course thumbnail
+ *         price:
+ *           type: number
+ *           description: The price of the course
+ *         syllabus:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               contentType:
+ *                 type: string
+ *                 enum: [video, text, quiz]
+ *               contentUrl:
+ *                 type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: The date the course was created
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: The date the course was last updated
+ */
 import mongoose, { Schema } from 'mongoose';
+
 import { ICourse } from './types';
 
 const CourseSchema = new Schema<ICourse>(
