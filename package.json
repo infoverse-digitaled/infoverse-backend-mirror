@@ -11,6 +11,7 @@
     "commit": "cz",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
+    "worker": "ts-node -r dotenv/config src/emailWorker.ts",
     "test": "jest"
   },
   "repository": {

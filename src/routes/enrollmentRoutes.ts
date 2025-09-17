@@ -71,7 +71,7 @@ enrollmentRouter.get('/:courseId/enrollments', authenticateJWT, isInstructor, ge
  * @swagger
  * /api/v1/courses/{courseId}/enrollments/{enrollmentId}:
  *   put:
- *     summary: Update an enrollment status (instructor only)
+ *     summary: Update an enrollment status (student only)
  *     tags: [Enrollments]
  *     security:
  *       - bearerAuth: []
