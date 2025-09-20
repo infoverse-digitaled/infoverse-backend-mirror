@@ -122,12 +122,34 @@ export const getCourseById = async (req: Request, res: Response) => {
 };
 
 export const createCourse = async (req: AuthenticatedRequest, res: Response) => {
-  const instructorId = req.user!.id;
-  if (!mongoose.Types.ObjectId.isValid(instructorId)) {
-    throw new HttpError(400, 'Invalid instructor ID', 'INVALID_ID');
-  }
   try {
-    const course = await Course.create({ ...req.body, instructorId: req.user!.id });
+    const { title, description, thumbnailUrl, price, syllabus, instructorId } = req.body;
+    const currentUser = req.user;
+
+    let finalInstructorId;
+
+    if (currentUser!.role === 'admin') {
+      if (!instructorId) {
+        return new HttpError(
+          400,
+          'Admin must specify an instructorId in the request body.',
+          'INSTRUCTOR_ID_REQUIRED',
+        );
+      }
+      finalInstructorId = instructorId;
+    }
+    if (currentUser!.role === 'instructor') {
+      finalInstructorId = currentUser!.id;
+    }
+
+    const course = await Course.create({
+      title,
+      description,
+      thumbnailUrl,
+      price,
+      syllabus,
+      instructorId: finalInstructorId,
+    });
     if (redisClient.isReady) {
       try {
         await redisClient.del('courses:*');
@@ -136,9 +158,9 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
       }
     }
     successResponse(res, course, 'Course created successfully', 201);
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+    throw new HttpError(500, 'Internal server error', error.message);
   }
 };
 

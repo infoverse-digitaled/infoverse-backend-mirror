@@ -2,19 +2,25 @@ import { Router } from 'express';
 import {
   getAllUsers,
   createUser,
-  getAllCourses,
   getUserById,
   deleteUser,
-  deleteCourse,
   updateUser,
 } from '../controllers/adminControllers/adminController';
-import { getCourseById, createCourse } from '../controllers/courseController';
-import { deleteReview } from '../controllers/reviewController';
 import {
-  getCourseEnrollments,
-  getUserEnrollments,
-} from '../controllers/enrollmentController';
+  listCourses,
+  getCourseById,
+  createCourse,
+  deleteCourse,
+} from '../controllers/courseController';
+import { deleteReview } from '../controllers/reviewController';
+import { getCourseEnrollments, getUserEnrollments } from '../controllers/enrollmentController';
 import { authenticateJWT } from '../middleware/authMiddleware';
+import {
+  adminCreateUserValidationRules,
+  adminUpdateUserValidationRules,
+  adminCourseCreationValidationRules,
+} from '../middleware/validators/adminValidators';
+import validateRequest from '../middleware/validators/validateRequest';
 import { isAdmin } from '../middleware/roles/isAdmin';
 
 const router = Router();
@@ -120,7 +126,14 @@ router.get('/users/:id', authenticateJWT, isAdmin, getUserById);
  *       409:
  *         description: User with this email already exists
  */
-router.post('/users', authenticateJWT, isAdmin, createUser);
+router.post(
+  '/users',
+  authenticateJWT,
+  isAdmin,
+  adminCreateUserValidationRules,
+  validateRequest,
+  createUser,
+);
 /**
  * @swagger
  * /api/v1/admin/users/{id}:
@@ -167,7 +180,14 @@ router.post('/users', authenticateJWT, isAdmin, createUser);
  *       404:
  *         description: User not found
  */
-router.put('/users/:id', authenticateJWT, isAdmin, updateUser);
+router.put(
+  '/users/:id',
+  authenticateJWT,
+  isAdmin,
+  adminUpdateUserValidationRules,
+  validateRequest,
+  updateUser
+);
 /**
  * @swagger
  * /api/v1/admin/users/{id}:
@@ -323,9 +343,16 @@ router.delete('/users/:id', authenticateJWT, isAdmin, deleteUser);
  *       404:
  *         description: Course not found
  */
-router.get('/courses', authenticateJWT, isAdmin, getAllCourses);
+router.get('/courses', authenticateJWT, isAdmin, listCourses);
 router.get('/courses/:id', authenticateJWT, isAdmin, getCourseById);
-router.post('/courses', authenticateJWT, isAdmin, createCourse);
+router.post(
+  '/courses',
+  authenticateJWT,
+  isAdmin,
+  adminCourseCreationValidationRules,
+  validateRequest,
+  createCourse,
+);
 router.delete('/courses/:id', authenticateJWT, isAdmin, deleteCourse);
 
 // Review Management
