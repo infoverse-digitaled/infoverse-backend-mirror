@@ -43,7 +43,7 @@ router.post('/test', (_req, res) => res.json({ ok: true }));
  *           example:
  *             name: John Doe
  *             email: john@example.com
- *             password: strongpassword123
+ *             password: strongpassword123#
  *     responses:
  *       201:
  *         description: User registered successfully

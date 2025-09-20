@@ -22,6 +22,7 @@ export const getAllUsers = async (_req: Request, res: Response) => {
     }
     successResponse(res, users, 'Users retrieved successfully');
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
 };
@@ -52,9 +53,6 @@ export const getUserById = async (req: Request, res: Response) => {
 export const createUser = async (req: Request, res: Response) => {
   try {
     const { name, email, password, role } = req.body;
-    if (!name || !email || !password || !role) {
-      throw new HttpError(400, 'Name, email, password, and role are required.', 'BAD_REQUEST');
-    }
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
@@ -89,7 +87,10 @@ export const updateUser = async (req: Request, res: Response) => {
       otherFields.passwordHash = await bcrypt.hash(password, 10);
     }
     if (otherFields.email) {
-      const existingUser = await User.findOne({ email: otherFields.email, _id: { $ne: req.params.id } });
+      const existingUser = await User.findOne({
+        email: otherFields.email,
+        _id: { $ne: req.params.id },
+      });
       if (existingUser) {
         throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
       }
@@ -111,24 +112,3 @@ export const updateUser = async (req: Request, res: Response) => {
   }
 };
 
-export const getAllCourses = async (_req: Request, res: Response) => {
-  try {
-    const courses = await Course.find();
-    successResponse(res, courses, 'Courses retrieved successfully');
-  } catch (error) {
-    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
-  }
-};
-
-export const deleteCourse = async (req: Request, res: Response) => {
-  try {
-    const course = await Course.findByIdAndDelete(req.params.id);
-    if (!course) {
-      throw new HttpError(404, 'Course not found', 'NOT_FOUND');
-    }
-    successResponse(res, [], 'Course deleted successfully');
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
-  }
-};

@@ -32,7 +32,7 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
     next();
   } catch (err) {
     return res.status(401).json({
-      error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' },
+      error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token. Please log in again.' },
     });
   }
 };

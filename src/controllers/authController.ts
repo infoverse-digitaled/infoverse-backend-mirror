@@ -20,7 +20,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       // Use a custom HttpError to handle the response uniformly.
-      throw new HttpError(400, 'EMAIL_EXISTS', 'Email already in use');
+      throw new HttpError(409, 'EMAIL_EXISTS', 'Email already in use.');
     }
     
     // Hash the user's password with a salt round of 10 for security.
@@ -43,22 +43,17 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
-    
-    // Validate that both email and password were provided in the request body.
-    if (!email || !password) {
-      throw new HttpError(400, 'Email and password are required.', 'BAD_REQUEST');
-    }
 
     // Find the user by their email.
     const user = await User.findOne({ email });
     if (!user) {
-      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
     }
 
     // Compare the provided password with the stored password hash.
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
-      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
     }
     
     // Create a JSON Web Token with the user's ID and role, expiring in 7 days.
@@ -97,7 +92,8 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       return successResponse(
         res,
         null,
-        'If a user with that email exists, a password reset token has been sent.');
+        'If a user with that email exists, a password reset token has been sent.',
+      );
     }
 
     // 2. Generate the random reset token
@@ -135,14 +131,14 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       return next(
         new HttpError(
           500,
-          'There was an error sending the email. Please try again later.',
           'EMAIL_SENDING_ERROR',
+          'There was an error sending the email. Please try again later.',
         ),
       );
     }
 
   } catch (error) {
-    next(new HttpError(500, 'An unexpected error occurred.', 'INTERNAL_SERVER_ERROR'));
+    next(new HttpError(500, 'INTERNAL_SERVER_ERROR', 'An unexpected error occurred.'));
   }
 };
 
@@ -150,21 +146,19 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
   try {
     // 1. Get user based on the token from the URL
     const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
-    console.log('hashedtoken now');
 
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: Date.now() }, // Check if the token is not expired
     });
-    console.log('founduser');
     // 2. If token is invalid or expired, return an error
     if (!user) {
-      return next(new HttpError(400, 'Token is invalid or has expired.', 'INVALID_TOKEN'));
+      return next(new HttpError(400, 'INVALID_TOKEN', 'Token is invalid or has expired.'));
     }
 
     // 3. Check if a new password is provided
     if (!req.body.password) {
-      return next(new HttpError(400, 'Please provide a new password.', 'MISSING_PASSWORD'));
+      return next(new HttpError(400, 'MISSING_PASSWORD', 'Please provide a new password.'));
     }
 
     // 4. Hash the new password and update the user document
@@ -172,8 +166,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
-    console.log('new pasasword saved');
-    console.log('attempting log in now...');
+
 
     // 5. Log the user in by sending a new JWT
     const token = jwt.sign({ userId: user._id, role: user.role }, config.jwt.secret, {
@@ -186,8 +179,8 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     next(
       new HttpError(
         500,
-        'Something went wrong while resetting the password.',
         'INTERNAL_SERVER_ERROR',
+        'Something went wrong while resetting the password.',
       ),
     );
   }

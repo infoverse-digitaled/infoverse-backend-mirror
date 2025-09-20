@@ -58,7 +58,12 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
       console.error('Failed to clear enrollment cache', e);
     }
   }
-  successResponse(res, enrollment, 'Enrolled successfully! A confirmation email is being sent.', 201);
+  successResponse(
+    res,
+    enrollment,
+    'Enrolled successfully! A confirmation email is being sent.',
+    201,
+  );
 };
 
 export const getCourseEnrollments = async (req: Request, res: Response) => {

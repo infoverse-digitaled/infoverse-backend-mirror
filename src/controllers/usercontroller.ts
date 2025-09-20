@@ -72,7 +72,11 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
       }
       update.passwordHash = await bcrypt.hash(newPassword, 10);
     } else if (newPassword || currentPassword) {
-      throw new HttpError(400, 'Both current and new password are required to change password', 'BAD_REQUEST');
+      throw new HttpError(
+        400,
+        'Both current and new password are required to change password',
+        'BAD_REQUEST',
+      );
     }
 
     // Handle other profile updates

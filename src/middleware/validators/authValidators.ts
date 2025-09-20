@@ -1,18 +1,18 @@
 import { body } from 'express-validator';
 
-// Define validation and sanitization rules for authentication
+
 export const loginValidationRules = [
   // Validate and sanitize the name field
   body('name')
     .notEmpty().withMessage('Name is required')
-    .trim() // <-- Removes leading/trailing whitespace
-    .escape(), // <-- Converts special characters to HTML entities
+    .trim() 
+    .escape(), 
 
   // Validate and sanitize the email field
   body('email')
     .isEmail().withMessage('Invalid email format')
     .notEmpty().withMessage('Email cannot be empty')
-    .normalizeEmail(), // <-- Normalizes the email address
+    .normalizeEmail(), 
 
   // Validate and sanitize the password field
   body('password')
