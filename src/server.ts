@@ -1,17 +1,19 @@
 import express from 'express';
-import { createClient } from 'redis';
+import Redis from 'ioredis';
 import config from './config';
 
-export const redisClient = createClient({
-  url: config.redis.url,
+export const redisClient = new Redis(config.redis.url, {
+  maxRetriesPerRequest: 3,
+  enableReadyCheck: true,
+  lazyConnect: true,
 });
 
 redisClient.on('error', (err) => console.error('Redis Client Error', err));
+redisClient.on('connect', () => console.log('Connected to Redis'));
 
 const connectRedis = async () => {
   try {
     await redisClient.connect();
-    console.log('Connected to Redis');
   } catch (err) {
     console.error('Failed to connect to Redis', err);
   }

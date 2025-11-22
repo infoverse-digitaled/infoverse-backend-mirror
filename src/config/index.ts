@@ -23,6 +23,11 @@ interface AppConfig {
     expiresIn: string;
   };
   frontendUrl: string;
+  oak: {
+    apiBaseUrl: string;
+    apiKey: string;
+    rateLimit: number;
+  };
 }
 
 /**
@@ -40,6 +45,9 @@ const validateConfig = (): AppConfig => {
     JWT_SECRET,
     JWT_EXPIRES_IN,
     FRONTEND_URL,
+    OAK_API_BASE_URL,
+    OAK_API_KEY,
+    OAK_API_RATE_LIMIT,
   } = process.env;
 
   // --- Validation for required variables ---
@@ -87,6 +95,11 @@ const validateConfig = (): AppConfig => {
       expiresIn: JWT_EXPIRES_IN || '1d',
     },
     frontendUrl: FRONTEND_URL || 'http://localhost:3000',
+    oak: {
+      apiBaseUrl: OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0',
+      apiKey: OAK_API_KEY || '',
+      rateLimit: OAK_API_RATE_LIMIT ? parseInt(OAK_API_RATE_LIMIT, 10) : 100,
+    },
   };
 };
 
