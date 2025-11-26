@@ -22,8 +22,8 @@ module.exports = {
     "/dist/"
   ],
   // Set up a global setup script to start the server and DB connection before tests
-  globalSetup: "./tests/setup.ts",
+  // globalSetup: "./tests/setup.ts",
   // Set up a global teardown script to close the server and DB connection after tests
-  globalTeardown: "./tests/teardown.ts",
+  // globalTeardown: "./tests/teardown.ts",
   // --- End of new additions ---
 };
