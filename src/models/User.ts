@@ -26,8 +26,8 @@
  *           enum: [student, instructor, admin]
  *           description: The role of the user
  *         keyStage:
- *           type: number
- *           enum: [1, 2, 3, 4]
+ *           type: string
+ *           enum: [ks1, ks2, ks3, ks4]
  *           description: The key stage of the user (UK education system)
  *         yearGroup:
  *           type: number
@@ -83,9 +83,9 @@ const UserSchema = new Schema<IUser>(
       required: true,
     },
     keyStage: {
-      type: Number,
+      type: String,
       required: [true, 'Key Stage is required'],
-      enum: [1, 2, 3, 4],
+      enum: ['ks1', 'ks2', 'ks3', 'ks4'],
     },
     yearGroup: {
       type: Number,

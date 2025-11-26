@@ -81,7 +81,12 @@ const CourseSchema = new Schema<ICourse>(
     instructorId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Instructor is required'],
+      required: [
+        function(this: ICourse) {
+          return this.source === 'internal';
+        },
+        'Instructor is required for internal courses',
+      ],
     },
     thumbnailUrl: {
       type: String,
