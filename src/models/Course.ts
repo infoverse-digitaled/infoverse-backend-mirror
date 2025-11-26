@@ -28,6 +28,18 @@
  *         price:
  *           type: number
  *           description: The price of the course
+ *         source:
+ *           type: string
+ *           enum: [internal, oak]
+ *           description: The source of the course content
+ *         oakMetadata:
+ *           type: object
+ *           properties:
+ *             keyStage:
+ *               type: string
+ *             subjectSlug:
+ *               type: string
+ *           description: Metadata for Oak-sourced courses
  *         syllabus:
  *           type: array
  *           items:
@@ -80,6 +92,26 @@ const CourseSchema = new Schema<ICourse>(
       default: 0,
       min: [0, 'Price cannot be negative'],
     },
+    source: {
+      type: String,
+      enum: ['internal', 'oak'],
+      default: 'internal',
+      required: true,
+    },
+    oakMetadata: {
+      type: {
+        keyStage: {
+          type: String,
+          enum: ['ks1', 'ks2', 'ks3', 'ks4'],
+          required: false,
+        },
+        subjectSlug: {
+          type: String,
+          required: false,
+        },
+      },
+      required: false,
+    },
     syllabus: [
       {
         title: { type: String, required: true },
@@ -98,5 +130,7 @@ const CourseSchema = new Schema<ICourse>(
 // Indexes
 CourseSchema.index({ title: 'text', description: 'text' }); // Text search for title and description
 CourseSchema.index({ instructorId: 1 }); // Index for instructor-specific queries
+CourseSchema.index({ source: 1 }); // Index for filtering by source
+CourseSchema.index({ 'oakMetadata.keyStage': 1, 'oakMetadata.subjectSlug': 1 }); // Index for Oak course queries
 
 export default mongoose.model<ICourse>('Course', CourseSchema);
