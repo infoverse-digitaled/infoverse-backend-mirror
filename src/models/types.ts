@@ -6,6 +6,12 @@ export interface IUser extends Document {
   passwordHash: string;
   name: string;
   role: 'student' | 'instructor';
+  keyStage: 1 | 2 | 3 | 4;
+  yearGroup?: number;
+  preferences: {
+    subjects: string[];
+    learningStyle?: string;
+  };
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   createdAt: Date;
