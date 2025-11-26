@@ -10,6 +10,7 @@
  *         - passwordHash
  *         - name
  *         - role
+ *         - keyStage
  *       properties:
  *         _id:
  *           type: string
@@ -24,6 +25,24 @@
  *           type: string
  *           enum: [student, instructor, admin]
  *           description: The role of the user
+ *         keyStage:
+ *           type: number
+ *           enum: [1, 2, 3, 4]
+ *           description: The key stage of the user (UK education system)
+ *         yearGroup:
+ *           type: number
+ *           description: The year group of the user
+ *         preferences:
+ *           type: object
+ *           properties:
+ *             subjects:
+ *               type: array
+ *               items:
+ *                 type: string
+ *               description: Preferred subjects
+ *             learningStyle:
+ *               type: string
+ *               description: Preferred learning style
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -62,6 +81,28 @@ const UserSchema = new Schema<IUser>(
       enum: ['student', 'instructor', 'admin'],
       default: 'student',
       required: true,
+    },
+    keyStage: {
+      type: Number,
+      required: [true, 'Key Stage is required'],
+      enum: [1, 2, 3, 4],
+    },
+    yearGroup: {
+      type: Number,
+      required: false,
+    },
+    preferences: {
+      type: {
+        subjects: {
+          type: [String],
+          default: [],
+        },
+        learningStyle: {
+          type: String,
+          required: false,
+        },
+      },
+      default: { subjects: [] },
     },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
