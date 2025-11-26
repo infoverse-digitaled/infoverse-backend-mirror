@@ -26,28 +26,24 @@ describe('OakApiService', () => {
   describe('getKeyStages', () => {
     const mockKeyStages: KeyStage[] = [
       {
-        id: 'ks1',
-        title: 'Key Stage 1',
         slug: 'ks1',
-        description: 'Ages 5-7',
+        title: 'Key Stage 1',
+        shortCode: 'KS1',
       },
       {
-        id: 'ks2',
-        title: 'Key Stage 2',
         slug: 'ks2',
-        description: 'Ages 7-11',
+        title: 'Key Stage 2',
+        shortCode: 'KS2',
       },
       {
-        id: 'ks3',
-        title: 'Key Stage 3',
         slug: 'ks3',
-        description: 'Ages 11-14',
+        title: 'Key Stage 3',
+        shortCode: 'KS3',
       },
       {
-        id: 'ks4',
-        title: 'Key Stage 4',
         slug: 'ks4',
-        description: 'Ages 14-16',
+        title: 'Key Stage 4',
+        shortCode: 'KS4',
       },
     ];
 
