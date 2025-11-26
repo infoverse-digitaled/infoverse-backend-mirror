@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { redisClient } from '../server';
 import config from '../config';
 import {
   KeyStage,
@@ -14,6 +13,17 @@ import {
   OakApiError,
 } from './oakApiTypes';
 
+// Lazy import for redisClient to avoid circular dependencies during testing
+let defaultRedisClient: RedisClientInterface | null = null;
+const getDefaultRedisClient = (): RedisClientInterface => {
+  if (!defaultRedisClient) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+    const { redisClient } = require('../server');
+    defaultRedisClient = redisClient;
+  }
+  return defaultRedisClient as RedisClientInterface;
+};
+
 /**
  * Cache Time-To-Live (TTL) values in seconds
  */
@@ -27,18 +37,31 @@ const CACHE_TTL = {
 };
 
 /**
+ * Interface for Redis client dependency
+ */
+export interface RedisClientInterface {
+  get(key: string): Promise<string | null>;
+  setex(key: string, seconds: number, value: string): Promise<unknown>;
+  keys(pattern: string): Promise<string[]>;
+  del(...keys: string[]): Promise<number>;
+}
+
+/**
  * Oak National Academy API Service
  * Provides methods to interact with the Oak API with Redis caching
  */
-class OakApiService {
+export class OakApiService {
   private axiosInstance: AxiosInstance;
+
+  private redis: RedisClientInterface;
 
   private rateLimitRemaining: number;
 
   private rateLimitReset: Date | null;
 
-  constructor() {
-    this.axiosInstance = axios.create({
+  constructor(redisClient?: RedisClientInterface, axiosInstance?: AxiosInstance) {
+    this.redis = redisClient || getDefaultRedisClient();
+    this.axiosInstance = axiosInstance || axios.create({
       baseURL: config.oak.apiBaseUrl,
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +114,7 @@ class OakApiService {
     // Try to get from cache first (unless skipping cache)
     if (!skipCache) {
       try {
-        const cached = await redisClient.get(cacheKey);
+        const cached = await this.redis.get(cacheKey);
         if (cached) {
           return JSON.parse(cached) as T;
         }
@@ -107,7 +130,7 @@ class OakApiService {
     // Store in cache (don't cache if TTL is 0)
     if (ttl > 0) {
       try {
-        await redisClient.setex(cacheKey, ttl, JSON.stringify(data));
+        await this.redis.setex(cacheKey, ttl, JSON.stringify(data));
       } catch (error) {
         console.error(`Cache set error for key ${cacheKey}:`, error);
         // Continue anyway, just log the error
@@ -336,11 +359,11 @@ class OakApiService {
    */
   async clearCache(pattern: string): Promise<number> {
     try {
-      const keys = await redisClient.keys(`oak:${pattern}*`);
+      const keys = await this.redis.keys(`oak:${pattern}*`);
       if (keys.length === 0) {
         return 0;
       }
-      return await redisClient.del(...keys);
+      return await this.redis.del(...keys);
     } catch (error) {
       console.error('Cache clear error:', error);
       throw error;
@@ -358,5 +381,32 @@ class OakApiService {
   }
 }
 
-// Export singleton instance
-export default new OakApiService();
+// Lazy singleton instance
+let instance: OakApiService | null = null;
+
+/**
+ * Get the singleton OakApiService instance
+ */
+export const getOakApiService = (): OakApiService => {
+  if (!instance) {
+    instance = new OakApiService();
+  }
+  return instance;
+};
+
+// Export singleton instance (lazy)
+export default {
+  get instance() {
+    return getOakApiService();
+  },
+  getKeyStages: () => getOakApiService().getKeyStages(),
+  getSubjectsByKeyStage: (keyStage: number) => getOakApiService().getSubjectsByKeyStage(keyStage),
+  getUnits: (keyStage: number, subjectSlug: string) => getOakApiService().getUnits(keyStage, subjectSlug),
+  getLessons: (unitSlug: string) => getOakApiService().getLessons(unitSlug),
+  getLessonDetails: (lessonSlug: string) => getOakApiService().getLessonDetails(lessonSlug),
+  getLessonVideo: (lessonSlug: string) => getOakApiService().getLessonVideo(lessonSlug),
+  getLessonQuiz: (lessonSlug: string) => getOakApiService().getLessonQuiz(lessonSlug),
+  searchLessons: (query: string, filters?: SearchFilters) => getOakApiService().searchLessons(query, filters),
+  clearCache: (pattern: string) => getOakApiService().clearCache(pattern),
+  getRateLimitStatus: () => getOakApiService().getRateLimitStatus(),
+};
