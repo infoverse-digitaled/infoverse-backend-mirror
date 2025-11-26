@@ -3,6 +3,20 @@ import { redisClient } from '../../server';
 import oakApiService from '../../services/oakApiService';
 import { KeyStage } from '../../services/oakApiTypes';
 
+// Mock config
+jest.mock('../../config', () => ({
+  default: {
+    oak: {
+      apiBaseUrl: 'https://api.example.com',
+      apiKey: 'test-api-key',
+      rateLimit: {
+        maxRequests: 100,
+        windowMs: 60000,
+      },
+    },
+  },
+}));
+
 // Mock axios
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
