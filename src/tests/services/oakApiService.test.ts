@@ -9,10 +9,7 @@ jest.mock('../../config', () => ({
     oak: {
       apiBaseUrl: 'https://api.example.com',
       apiKey: 'test-api-key',
-      rateLimit: {
-        maxRequests: 100,
-        windowMs: 60000,
-      },
+      rateLimit: 100,
     },
   },
 }));
