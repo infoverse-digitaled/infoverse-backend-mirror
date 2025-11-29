@@ -117,7 +117,7 @@ export interface Keyword {
  * Search filters for lessons
  */
 export interface SearchFilters {
-  keyStage?: number;
+  keyStage?: string;
   subjectSlug?: string;
   yearSlug?: string;
   page?: number;

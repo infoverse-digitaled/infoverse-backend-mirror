@@ -205,14 +205,14 @@ export class OakApiService {
   /**
    * Get subjects by key stage
    */
-  async getSubjectsByKeyStage(keyStage: number): Promise<Subject[]> {
+  async getSubjectsByKeyStage(keyStage: string): Promise<Subject[]> {
     const cacheKey = `oak:keystage:${keyStage}:subjects`;
 
     return this.getCached(cacheKey, CACHE_TTL.SUBJECTS, async () => {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<Subject[]>(`/key-stages/ks${keyStage}/subjects`);
+        const response = await this.axiosInstance.get<Subject[]>(`/key-stages/${keyStage}/subjects`);
         return response.data;
       } catch (error) {
         return this.handleApiError(error);
@@ -223,7 +223,7 @@ export class OakApiService {
   /**
    * Get units for a specific key stage and subject
    */
-  async getUnits(keyStage: number, subjectSlug: string): Promise<Unit[]> {
+  async getUnits(keyStage: string, subjectSlug: string): Promise<Unit[]> {
     const cacheKey = `oak:keystage:${keyStage}:subject:${subjectSlug}:units`;
 
     return this.getCached(cacheKey, CACHE_TTL.UNITS, async () => {
@@ -231,7 +231,7 @@ export class OakApiService {
 
       try {
         const response = await this.axiosInstance.get<Unit[]>(
-          `/key-stages/ks${keyStage}/subjects/${subjectSlug}/units`,
+          `/key-stages/${keyStage}/subjects/${subjectSlug}/units`,
         );
         return response.data;
       } catch (error) {
@@ -338,7 +338,7 @@ export class OakApiService {
           limit,
         };
 
-        if (keyStage) params.keyStage = `ks${keyStage}`;
+        if (keyStage) params.keyStage = keyStage;
         if (subjectSlug) params.subject = subjectSlug;
         if (yearSlug) params.year = yearSlug;
 
@@ -400,8 +400,8 @@ export default {
     return getOakApiService();
   },
   getKeyStages: () => getOakApiService().getKeyStages(),
-  getSubjectsByKeyStage: (keyStage: number) => getOakApiService().getSubjectsByKeyStage(keyStage),
-  getUnits: (keyStage: number, subjectSlug: string) => getOakApiService().getUnits(keyStage, subjectSlug),
+  getSubjectsByKeyStage: (keyStage: string) => getOakApiService().getSubjectsByKeyStage(keyStage),
+  getUnits: (keyStage: string, subjectSlug: string) => getOakApiService().getUnits(keyStage, subjectSlug),
   getLessons: (unitSlug: string) => getOakApiService().getLessons(unitSlug),
   getLessonDetails: (lessonSlug: string) => getOakApiService().getLessonDetails(lessonSlug),
   getLessonVideo: (lessonSlug: string) => getOakApiService().getLessonVideo(lessonSlug),

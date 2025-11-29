@@ -17,10 +17,14 @@ module.exports = {
     "**/?(*.)+(spec|test).ts"
   ],
   // Ignore the 'dist' directory
-  testPathIgnorePatterns: [
+  "testPathIgnorePatterns": [
     "/node_modules/",
     "/dist/"
   ],
+  "transformIgnorePatterns": [
+    "/node_modules/(?!@faker-js/faker).+\\.js$"
+  ],
+
   // Set up a global setup script to start the server and DB connection before tests
   // globalSetup: "./tests/setup.ts",
   // Set up a global teardown script to close the server and DB connection after tests
