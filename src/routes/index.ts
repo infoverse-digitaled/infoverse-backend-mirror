@@ -8,6 +8,7 @@ import userRouter from './userRoutes';
 import reviewRouter from './reviewRoutes';
 import adminRouter from './adminRoutes';
 import oakContentRouter from './oakContent';
+import oakProgressRouter from './oakProgress';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/courses', enrollmentRouter);
 router.use('/users', userRouter);
 router.use('/admin', adminRouter);
 router.use('/oak', oakContentRouter);
+router.use('/progress', oakProgressRouter);
 
 export default router;
