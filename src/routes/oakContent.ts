@@ -7,8 +7,11 @@ import {
   getLessonDetails,
   searchLessons,
 } from '../controllers/oakContentController';
+import { optionalAuth } from '../middleware/authMiddleware';
 
 const router = Router();
+
+router.use(optionalAuth);
 
 router.get('/keystages', getKeyStages);
 router.get('/keystages/:keyStage/subjects', getSubjects);

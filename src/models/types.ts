@@ -6,6 +6,11 @@ export interface IUser extends Document {
   passwordHash: string;
   name: string;
   role: 'student' | 'instructor';
+  subscription: {
+    plan: 'free' | 'premium';
+    status: 'active' | 'inactive' | 'cancelled';
+    expiresAt?: Date;
+  };
   keyStage: 'ks1' | 'ks2' | 'ks3' | 'ks4';
   yearGroup?: number;
   preferences: {

@@ -82,6 +82,21 @@ const UserSchema = new Schema<IUser>(
       default: 'student',
       required: true,
     },
+    subscription: {
+      plan: {
+        type: String,
+        enum: ['free', 'premium'],
+        default: 'free',
+      },
+      status: {
+        type: String,
+        enum: ['active', 'inactive', 'cancelled'],
+        default: 'active',
+      },
+      expiresAt: {
+        type: Date,
+      },
+    },
     keyStage: {
       type: String,
       required: [true, 'Key Stage is required'],
