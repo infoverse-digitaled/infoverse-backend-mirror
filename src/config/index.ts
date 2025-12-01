@@ -1,8 +1,7 @@
-import dotenv from 'dotenv';
-import path from 'path';
-
-// Load environment variables from .env file
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Environment variables are now loaded globally in app.ts
+// import dotenv from 'dotenv';
+// import path from 'path';
+// dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 /**
  * Defines the shape of the application's configuration.
@@ -28,6 +27,9 @@ interface AppConfig {
     apiKey: string;
     rateLimit: number;
   };
+  paystack: {
+    secretKey: string;
+  };
 }
 
 /**
@@ -48,6 +50,7 @@ const validateConfig = (): AppConfig => {
     OAK_API_BASE_URL,
     OAK_API_KEY,
     OAK_API_RATE_LIMIT,
+    PAYSTACK_SECRET_KEY,
   } = process.env;
 
   // --- Validation for required variables ---
@@ -58,6 +61,13 @@ const validateConfig = (): AppConfig => {
   if (!JWT_SECRET) {
     throw new Error('Missing required environment variable: JWT_SECRET');
   }
+
+  // NOTE: In a real production scenario, we should enforce PAYSTACK_SECRET_KEY presence.
+  // For development or if payment is optional, we might make it optional or provide a default/mock.
+  // Here we'll treat it as optional for now to avoid breaking existing setups without the key,
+  // but strictly strictly speaking for the feature request, it's needed.
+  // Let's default to an empty string if missing, but log a warning if needed (logging not shown here).
+  const paystackSecretKey = PAYSTACK_SECRET_KEY || '';
 
   const redisPort = REDIS_PORT ? parseInt(REDIS_PORT, 10) : 6379;
   if (Number.isNaN(redisPort)) {
@@ -99,6 +109,9 @@ const validateConfig = (): AppConfig => {
       apiBaseUrl: OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0',
       apiKey: OAK_API_KEY || '',
       rateLimit: OAK_API_RATE_LIMIT ? parseInt(OAK_API_RATE_LIMIT, 10) : 100,
+    },
+    paystack: {
+      secretKey: paystackSecretKey,
     },
   };
 };
