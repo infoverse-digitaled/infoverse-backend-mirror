@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Enrollment from '../models/Enrollment';
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
-import { redisClient } from '../server';
+import redisClient from '../config/redis';
 import { emailQueue } from '../utils/emailQueue'; // Assuming you have a queue setup for sending emails
 import { successResponse } from '../middleware/response';
 
@@ -50,7 +50,7 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
   }
   // --- CHANGE ENDS HERE ---
 
-  if (redisClient.isReady) {
+  if ((redisClient as any).status === 'ready') {
     try {
       await redisClient.del(`userEnrollments:${userId}`);
       await redisClient.del(`courseEnrollments:${courseId}`);
@@ -74,7 +74,7 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
     }
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
         const parsedCache = JSON.parse(cachedEnrollments);
@@ -85,7 +85,7 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
     const enrollments = await Enrollment.find({ courseId }).populate('userId');
     const response = { data: enrollments };
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
@@ -115,7 +115,7 @@ export const updateEnrollmentStatus = async (req: Request, res: Response) => {
       throw new HttpError(404, 'Enrollment not found', 'NOT_FOUND');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.del(`userEnrollments:${enrollment.userId}`);
         await redisClient.del(`courseEnrollments:${enrollment.courseId}`);
@@ -145,7 +145,7 @@ export const dropCourse = async (req: AuthenticatedRequest, res: Response) => {
       throw new HttpError(404, 'Enrollment not found', 'NOT_FOUND');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.del(`userEnrollments:${userId}`);
         await redisClient.del(`courseEnrollments:${courseId}`);
@@ -170,7 +170,7 @@ export const getUserEnrollments = async (req: Request, res: Response) => {
       throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
         const parsedCache = JSON.parse(cachedEnrollments);
@@ -181,7 +181,7 @@ export const getUserEnrollments = async (req: Request, res: Response) => {
     const enrollments = await Enrollment.find({ userId }).populate('courseId');
     const response = { data: enrollments };
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
     }
     successResponse(res, enrollments, 'Enrollments retrieved successfully');

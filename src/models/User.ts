@@ -10,7 +10,6 @@
  *         - passwordHash
  *         - name
  *         - role
- *         - keyStage
  *       properties:
  *         _id:
  *           type: string
@@ -28,7 +27,7 @@
  *         keyStage:
  *           type: string
  *           enum: [ks1, ks2, ks3, ks4]
- *           description: The key stage of the user (UK education system)
+ *           description: The key stage of the user (UK education system, optional)
  *         yearGroup:
  *           type: number
  *           description: The year group of the user
@@ -102,7 +101,7 @@ const UserSchema = new Schema<IUser>(
     },
     keyStage: {
       type: String,
-      required: [true, 'Key Stage is required'],
+      required: false,
       enum: ['ks1', 'ks2', 'ks3', 'ks4'],
     },
     yearGroup: {

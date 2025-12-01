@@ -83,7 +83,8 @@ const validateConfig = (): AppConfig => {
 
   // --- Return the validated and typed config object ---
   const env = NODE_ENV || 'development';
-  const redisUrl = env === 'development' ? 'redis://localhost:6379' : REDIS_URL;
+  // Default to 127.0.0.1 (localhost) for development to ensure Redis connectivity
+  const redisUrl = REDIS_URL || 'redis://127.0.0.1:6379';
 
   if (!redisUrl) {
     throw new Error('Missing required environment variable: REDIS_URL (for production)');

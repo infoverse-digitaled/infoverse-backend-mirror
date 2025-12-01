@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { authenticateJWT } from '../middleware/authMiddleware';
-import { validateRequest } from '../middleware/validators/validateRequest'; // Reusing existing validator middleware wrapper
+import validateRequest from '../middleware/validators/validateRequest'; // Reusing existing validator middleware wrapper
 import {
   enroll,
   updateProgress,

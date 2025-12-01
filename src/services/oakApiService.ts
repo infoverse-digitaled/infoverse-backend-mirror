@@ -12,17 +12,7 @@ import {
   SearchResults,
   OakApiError,
 } from './oakApiTypes';
-
-// Lazy import for redisClient to avoid circular dependencies during testing
-let defaultRedisClient: RedisClientInterface | null = null;
-const getDefaultRedisClient = (): RedisClientInterface => {
-  if (!defaultRedisClient) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-    const { redisClient } = require('../server');
-    defaultRedisClient = redisClient;
-  }
-  return defaultRedisClient as RedisClientInterface;
-};
+import redisClient from '../config/redis'; // Direct import of the Redis client
 
 /**
  * Cache Time-To-Live (TTL) values in seconds
@@ -41,7 +31,7 @@ const CACHE_TTL = {
  */
 export interface RedisClientInterface {
   get(key: string): Promise<string | null>;
-  setex(key: string, seconds: number, value: string): Promise<unknown>;
+  setEx(key: string, seconds: number, value: string): Promise<unknown>;
   keys(pattern: string): Promise<string[]>;
   del(...keys: string[]): Promise<number>;
 }
@@ -59,8 +49,8 @@ export class OakApiService {
 
   private rateLimitReset: Date | null;
 
-  constructor(redisClient?: RedisClientInterface, axiosInstance?: AxiosInstance) {
-    this.redis = redisClient || getDefaultRedisClient();
+  constructor(redisClientParam?: RedisClientInterface, axiosInstance?: AxiosInstance) {
+    this.redis = redisClientParam || redisClient; // Use the directly imported redisClient
     this.axiosInstance = axiosInstance || axios.create({
       baseURL: config.oak.apiBaseUrl,
       headers: {
@@ -130,7 +120,7 @@ export class OakApiService {
     // Store in cache (don't cache if TTL is 0)
     if (ttl > 0) {
       try {
-        await this.redis.setex(cacheKey, ttl, JSON.stringify(data));
+        await this.redis.setEx(cacheKey, ttl, JSON.stringify(data));
       } catch (error) {
         console.error(`Cache set error for key ${cacheKey}:`, error);
         // Continue anyway, just log the error
@@ -194,8 +184,9 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<KeyStage[]>('/key-stages');
-        return response.data;
+        const response = await this.axiosInstance.get<any>('/key-stages');
+        // Safely unwrap: Oak API returns { data: [...] }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -212,8 +203,9 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<Subject[]>(`/key-stages/${keyStage}/subjects`);
-        return response.data;
+        const response = await this.axiosInstance.get<any>(`/key-stages/${keyStage}/subjects`);
+        // Safely unwrap: Oak API returns { data: [...] }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -230,10 +222,11 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<Unit[]>(
+        const response = await this.axiosInstance.get<any>(
           `/key-stages/${keyStage}/subjects/${subjectSlug}/units`,
         );
-        return response.data;
+        // Safely unwrap: Oak API returns { data: [...] }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -250,8 +243,9 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<Lesson[]>(`/units/${unitSlug}/lessons`);
-        return response.data;
+        const response = await this.axiosInstance.get<any>(`/units/${unitSlug}/lessons`);
+        // Safely unwrap: Oak API returns { data: [...] }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -268,8 +262,9 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<LessonDetails>(`/lessons/${lessonSlug}`);
-        return response.data;
+        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}`);
+        // Safely unwrap: Oak API returns { data: {...} }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -291,8 +286,9 @@ export class OakApiService {
         this.checkRateLimit();
 
         try {
-          const response = await this.axiosInstance.get<Video>(`/lessons/${lessonSlug}/video`);
-          return response.data;
+          const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/video`);
+          // Safely unwrap: Oak API returns { data: {...} }
+          return response.data.data || response.data;
         } catch (error) {
           return this.handleApiError(error);
         }
@@ -311,8 +307,9 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<Quiz[]>(`/lessons/${lessonSlug}/quiz`);
-        return response.data;
+        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/quiz`);
+        // Safely unwrap: Oak API returns { data: [...] }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -342,11 +339,12 @@ export class OakApiService {
         if (subjectSlug) params.subject = subjectSlug;
         if (yearSlug) params.year = yearSlug;
 
-        const response = await this.axiosInstance.get<SearchResults<Lesson>>('/lessons/search', {
+        const response = await this.axiosInstance.get<any>('/lessons/search', {
           params,
         });
 
-        return response.data;
+        // Safely unwrap: Oak API returns { data: {...} }
+        return response.data.data || response.data;
       } catch (error) {
         return this.handleApiError(error);
       }

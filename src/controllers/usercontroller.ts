@@ -5,7 +5,7 @@ import User from '../models/User';
 import Enrollment from '../models/Enrollment';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
-import { redisClient } from '../server';
+import redisClient from '../config/redis';
 import { successResponse } from '../middleware/response';
 
 interface AuthenticatedRequest extends Request {
@@ -23,7 +23,7 @@ export const getUserProfile = async (req: AuthenticatedRequest, res: Response) =
     throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
   }
   try {
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedProfile = await redisClient.get(cacheKey);
       if (cachedProfile) {
         const parsedCache = JSON.parse(cachedProfile);
@@ -36,7 +36,7 @@ export const getUserProfile = async (req: AuthenticatedRequest, res: Response) =
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: profile }));
       } catch (e) {
@@ -94,7 +94,7 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       await redisClient.del(`user:${userId}`);
     }
 
@@ -112,7 +112,7 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
         const parsedCache = JSON.parse(cachedReviews);
@@ -125,7 +125,7 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
       throw new HttpError(404, 'No reviews found', 'NOT_FOUND');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: reviews }));
       } catch (e) {
@@ -147,7 +147,7 @@ export const getUserEnrollments = async (req: AuthenticatedRequest, res: Respons
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
         const parsedCache = JSON.parse(cachedEnrollments);
@@ -157,7 +157,7 @@ export const getUserEnrollments = async (req: AuthenticatedRequest, res: Respons
 
     const enrollments = await Enrollment.find({ userId }).populate('courseId');
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: enrollments }));
       } catch (e) {

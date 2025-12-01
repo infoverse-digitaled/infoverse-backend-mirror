@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import mongoose, { Query } from 'mongoose'; // <-- 1. Import the Query type
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
-import { redisClient } from '../server';
+import redisClient from '../config/redis';
 import { successResponse } from '../middleware/response';
 
 // Extend req typing for authenticated routes
@@ -35,7 +35,7 @@ export const listCourses = async (req: Request, res: Response) => {
   const cacheKey = `courses:page=${pageNum}&limit=${limitNum}&sort=${sort || ''}&fields=${fields || ''}&search=${search || ''}`;
 
   try {
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedCourses = await redisClient.get(cacheKey);
       if (cachedCourses) {
         const parsedCache = JSON.parse(cachedCourses);
@@ -76,7 +76,7 @@ export const listCourses = async (req: Request, res: Response) => {
       },
     };
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
     }
     successResponse(res, result, 'Courses retrieved successfully');
@@ -93,7 +93,7 @@ export const getCourseById = async (req: Request, res: Response) => {
     throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
   }
   try {
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedCourse = await redisClient.get(cacheKey);
       if (cachedCourse) {
         const parsedCache = JSON.parse(cachedCourse);
@@ -107,7 +107,7 @@ export const getCourseById = async (req: Request, res: Response) => {
     }
 
     const response = { data: course };
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
@@ -150,7 +150,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
       syllabus,
       instructorId: finalInstructorId,
     });
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.del('courses:*');
       } catch (e) {
@@ -173,7 +173,7 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response) => 
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.del(`course:${req.params.id}`);
         await redisClient.del('courses:*');
@@ -198,7 +198,7 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response) => 
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       try {
         await redisClient.del(`course:${req.params.id}`);
         await redisClient.del('courses:*');

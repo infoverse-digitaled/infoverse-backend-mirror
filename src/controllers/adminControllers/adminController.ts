@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import { redisClient } from '../../server';
+import redisClient from '../../config/redis';
 import User from '../../models/User';
 import Course from '../../models/Course';
 import { HttpError } from '../../utils/httpError';
@@ -8,7 +8,7 @@ import { successResponse } from '../../middleware/response';
 
 export const getAllUsers = async (_req: Request, res: Response) => {
   try {
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedUsers = await redisClient.get('users');
       if (cachedUsers) {
         const parsedCache = JSON.parse(cachedUsers);
@@ -17,7 +17,7 @@ export const getAllUsers = async (_req: Request, res: Response) => {
     }
 
     const users = await User.find();
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       await redisClient.setEx('users', 3600, JSON.stringify({ data: users }));
     }
     successResponse(res, users, 'Users retrieved successfully');
@@ -29,7 +29,7 @@ export const getAllUsers = async (_req: Request, res: Response) => {
 
 export const getUserById = async (req: Request, res: Response) => {
   try {
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       const cachedUser = await redisClient.get(`user:${req.params.id}`);
       if (cachedUser) {
         const parsedCache = JSON.parse(cachedUser);
@@ -40,7 +40,7 @@ export const getUserById = async (req: Request, res: Response) => {
     if (!user) {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       await redisClient.setEx(`user:${req.params.id}`, 3600, JSON.stringify({ data: user }));
     }
     successResponse(res, user, 'User retrieved successfully');
@@ -101,7 +101,7 @@ export const updateUser = async (req: Request, res: Response) => {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
 
-    if (redisClient.isReady) {
+    if ((redisClient as any).status === 'ready') {
       await redisClient.del(`user:${req.params.id}`);
       await redisClient.del('users');
     }

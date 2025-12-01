@@ -24,7 +24,7 @@ jest.spyOn(axios, 'isAxiosError').mockImplementation((payload: any) => payload?.
 // Create mock Redis client
 const createMockRedis = (): jest.Mocked<RedisClientInterface> => ({
   get: jest.fn(),
-  setex: jest.fn(),
+  setEx: jest.fn(),
   keys: jest.fn(),
   del: jest.fn(),
 });
@@ -93,7 +93,7 @@ describe('OakApiService', () => {
       expect(mockRedis.get).toHaveBeenCalledWith('oak:keystages');
 
       // Verify cache was set with correct TTL (24 hours = 86400 seconds)
-      expect(mockRedis.setex).toHaveBeenCalledWith(
+      expect(mockRedis.setEx).toHaveBeenCalledWith(
         'oak:keystages',
         86400,
         JSON.stringify(mockKeyStages),
@@ -118,7 +118,7 @@ describe('OakApiService', () => {
       expect(mockAxiosInstance.get).not.toHaveBeenCalled();
 
       // Verify cache was NOT set again
-      expect(mockRedis.setex).not.toHaveBeenCalled();
+      expect(mockRedis.setEx).not.toHaveBeenCalled();
     });
 
     it('should handle errors when Oak API is down', async () => {
@@ -141,7 +141,7 @@ describe('OakApiService', () => {
       expect(mockRedis.get).toHaveBeenCalledWith('oak:keystages');
 
       // Verify cache was NOT set (due to error)
-      expect(mockRedis.setex).not.toHaveBeenCalled();
+      expect(mockRedis.setEx).not.toHaveBeenCalled();
     });
 
     it('should handle 404 errors from Oak API', async () => {
@@ -225,7 +225,7 @@ describe('OakApiService', () => {
       mockRedis.get.mockResolvedValue(null);
 
       // Mock cache set error
-      mockRedis.setex.mockRejectedValue(new Error('Redis write error'));
+      mockRedis.setEx.mockRejectedValue(new Error('Redis write error'));
 
       // Mock successful API response
       mockAxiosInstance.get.mockResolvedValue({ data: mockKeyStages });

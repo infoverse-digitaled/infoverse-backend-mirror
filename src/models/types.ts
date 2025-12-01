@@ -12,7 +12,7 @@ export interface IUser extends Document {
     expiresAt?: Date;
     trialEndsAt?: Date;
   };
-  keyStage: 'ks1' | 'ks2' | 'ks3' | 'ks4';
+  keyStage?: 'ks1' | 'ks2' | 'ks3' | 'ks4';
   yearGroup?: number;
   preferences: {
     subjects: string[];
