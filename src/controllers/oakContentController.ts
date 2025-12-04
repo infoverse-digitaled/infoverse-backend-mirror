@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import oakApiService from '../services/oakApiService';
 import { successResponse } from '../middleware/response';
 import { HttpError } from '../utils/httpError';
-import { PAID_SUBJECTS } from '../config/curriculum';
+import { PAID_SUBJECTS, ALLOWED_SUBJECTS } from '../config/curriculum';
 
 // Extend Request to include user info from optionalAuth
 interface AuthenticatedRequest extends Request {
@@ -13,18 +13,39 @@ interface AuthenticatedRequest extends Request {
     email: string;
     subscription?: {
       plan: 'free' | 'premium';
-      status: 'active' | 'inactive' | 'cancelled';
+      status: 'active' | 'trialing' | 'inactive' | 'cancelled' | 'past_due' | 'free';
       expiresAt?: Date;
+      trialEndsAt?: Date;
     };
   };
 }
 
 const isFreeUser = (req: AuthenticatedRequest): boolean => {
-  // If no user, or subscription is not premium, consider them free
-  // Adjust logic if "status" needs to be checked (e.g. premium but inactive)
+  // Check subscription status to determine access level
+  // Premium Access (return false): status is 'active' OR ('trialing' AND not expired)
+  // Restricted Access (return true): all other cases
+
   if (!req.user) return true;
   if (!req.user.subscription) return true; // Default to free if missing
-  return req.user.subscription.plan === 'free';
+
+  const { status, trialEndsAt } = req.user.subscription;
+
+  // Users with active subscription get full access
+  if (status === 'active') {
+    return false;
+  }
+
+  // Users in trial get full access if the trial hasn't expired
+  if (status === 'trialing') {
+     if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
+       return false;
+     }
+     // Trial expired
+     return true;
+  }
+
+  // All other statuses (free, past_due, cancelled, inactive) are restricted
+  return true;
 };
 
 const getMeta = (req: AuthenticatedRequest) => {
@@ -51,9 +72,16 @@ export const getKeyStages = async (req: Request, res: Response, next: NextFuncti
 export const getSubjects = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { keyStage } = req.params;
-    const subjects: any[] = await oakApiService.getSubjectsByKeyStage(keyStage);
-    const freeUser = isFreeUser(req as AuthenticatedRequest);
 
+    // Get subjects from Oak API - now properly unwrapped to array
+    let subjects: any[] = await oakApiService.getSubjectsByKeyStage(keyStage);
+
+    // Step 1: Filter subjects to only those allowed for this key stage
+    const allowedSubjectsForKeyStage = ALLOWED_SUBJECTS[keyStage] || [];
+    subjects = subjects.filter((subject) => allowedSubjectsForKeyStage.includes(subject.slug));
+
+    // Step 2: Lock paid subjects for free users
+    const freeUser = isFreeUser(req as AuthenticatedRequest);
     if (freeUser) {
       subjects.forEach((subject) => {
         if (PAID_SUBJECTS.includes(subject.slug)) {
@@ -82,6 +110,19 @@ export const getUnits = async (req: Request, res: Response, next: NextFunction) 
 };
 
 /**
+ * Get unit details by slug
+ */
+export const getUnitDetails = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { unitSlug } = req.params;
+    const unit = await oakApiService.getUnitDetails(unitSlug);
+    successResponse(res, unit, 'Unit details retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get lessons by unit
  */
 export const getLessons = async (req: Request, res: Response, next: NextFunction) => {
@@ -96,7 +137,7 @@ export const getLessons = async (req: Request, res: Response, next: NextFunction
       const subjectSlug = lessons[0].subjectSlug;
 
       if (PAID_SUBJECTS.includes(subjectSlug)) {
-        // Paid subject: return 403 or empty. 
+        // Paid subject: return 403 or empty.
         // Prompt says "return empty list or 403". 403 is more informative.
         throw new HttpError(403, 'This content requires a premium subscription', 'PREMIUM_REQUIRED');
       } else {

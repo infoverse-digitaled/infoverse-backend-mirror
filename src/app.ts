@@ -40,8 +40,6 @@ mongoose
     logger.error('MongoDB connection error:', err);
   });
 
-startServer(app);
-
 // Middleware setup
 setupMiddleware(app);
 
@@ -60,5 +58,8 @@ setupSwagger(app);
 
 // Global error handler
 app.use(errorHandler);
+
+// Start server AFTER all middleware and routes are configured
+startServer(app);
 
 export default app;

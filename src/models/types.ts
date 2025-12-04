@@ -8,7 +8,7 @@ export interface IUser extends Document {
   role: 'student' | 'instructor';
   subscription: {
     plan: 'free' | 'premium';
-    status: 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
+    status: 'free' | 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
     expiresAt?: Date;
     trialEndsAt?: Date;
   };

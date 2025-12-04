@@ -3,6 +3,7 @@ import {
   getKeyStages,
   getSubjects,
   getUnits,
+  getUnitDetails,
   getLessons,
   getLessonDetails,
   searchLessons,
@@ -16,6 +17,7 @@ router.use(optionalAuth);
 router.get('/keystages', getKeyStages);
 router.get('/keystages/:keyStage/subjects', getSubjects);
 router.get('/subjects/:keyStage/:subjectSlug/units', getUnits);
+router.get('/units/:unitSlug', getUnitDetails);
 router.get('/units/:unitSlug/lessons', getLessons);
 router.get('/lessons/:lessonSlug', getLessonDetails);
 router.get('/search', searchLessons);

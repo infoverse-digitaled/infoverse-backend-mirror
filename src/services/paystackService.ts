@@ -53,9 +53,8 @@ export const verifyAndCreateTrial = async (reference: string) => {
       throw new Error('Missing authorization code or plan code');
     }
 
-    // 2. Calculate Start Date (7 days from now)
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() + 7);
+    // 2. Start Subscription Immediately
+    const startDate = new Date(); // Start now
 
     // 3. Create Subscription
     const subscriptionResponse = await axios.post(

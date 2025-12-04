@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { register, login, forgotPassword, resetPassword } from '../controllers/authController';
+import { register, login, forgotPassword, resetPassword, getMe } from '../controllers/authController';
 import {
   loginValidationRules,
   signupValidationRules,
@@ -15,6 +15,7 @@ import {
 } from '../middleware/validators/authValidators';
 import validateRequest from '../middleware/validators/validateRequest';
 import { authLimiter } from '../middleware/rateLimiter';
+import { authenticateJWT } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -126,5 +127,21 @@ router.patch(
   resetPasswordValidationRules,
   validateRequest,
   resetPassword);
+
+/**
+ * @swagger
+ * /api/v1/auth/me:
+ *   get:
+ *     summary: Get current authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User retrieved successfully
+ *       401:
+ *         description: User not authenticated
+ */
+router.get('/me', authenticateJWT, getMe);
 
 export default router;

@@ -26,8 +26,17 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     // Hash the user's password with a salt round of 10 for security.
     const passwordHash = await bcrypt.hash(password, 10);
     
-    // Create the new user in the database.
-    const newUser = await User.create({ name, email, passwordHash });
+    // Create the new user in the database with a 14-day free trial.
+    const newUser = await User.create({
+      name,
+      email,
+      passwordHash,
+      subscription: {
+        status: 'trialing',
+        plan: 'premium',
+        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      },
+    });
 
     successResponse(res, newUser, 'User registered successfully', 201);
   } catch (err) {
@@ -183,5 +192,29 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
         'Something went wrong while resetting the password.',
       ),
     );
+  }
+};
+
+/**
+ * Get current authenticated user's information
+ */
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      throw new HttpError(401, 'UNAUTHORIZED', 'User not authenticated.');
+    }
+
+    // Find user and exclude password hash
+    const user = await User.findById(userId).select('-passwordHash');
+
+    if (!user) {
+      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
+    }
+
+    successResponse(res, user, 'User retrieved successfully');
+  } catch (err) {
+    next(err);
   }
 };
