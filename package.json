@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "Infoverse Backend Development",
-  "main": "app.js",
+  "main": "dist/app.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",
