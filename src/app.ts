@@ -15,6 +15,9 @@ import logger from './utils/logger';
 
 const app = express();
 
+// Trust proxy for Render/production (required for rate limiting behind reverse proxy)
+app.set('trust proxy', 1);
+
 // Use express-status-monitor early in the middleware stack.
 app.use(statusMonitor());
 
