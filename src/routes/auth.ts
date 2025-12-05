@@ -6,12 +6,15 @@
  */
 
 import { Router } from 'express';
-import { register, login, forgotPassword, resetPassword, getMe } from '../controllers/authController';
+import { register, login, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
 import {
   loginValidationRules,
   signupValidationRules,
   forgotPasswordValidationRules,
   resetPasswordValidationRules,
+  onboardingValidationRules,
+  updateProfileValidationRules,
+  changePasswordValidationRules,
 } from '../middleware/validators/authValidators';
 import validateRequest from '../middleware/validators/validateRequest';
 import { authLimiter } from '../middleware/rateLimiter';
@@ -143,5 +146,79 @@ router.patch(
  *         description: User not authenticated
  */
 router.get('/me', authenticateJWT, getMe);
+
+/**
+ * @swagger
+ * /api/v1/auth/onboarding:
+ *   patch:
+ *     summary: Complete user onboarding
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             role: student
+ *             keyStage: ks2
+ *     responses:
+ *       200:
+ *         description: Onboarding completed successfully
+ *       400:
+ *         description: Invalid role or key stage
+ *       401:
+ *         description: User not authenticated
+ */
+router.patch('/onboarding', authenticateJWT, onboardingValidationRules, validateRequest, completeOnboarding);
+
+/**
+ * @swagger
+ * /api/v1/auth/profile:
+ *   patch:
+ *     summary: Update user profile
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             name: John Doe
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       400:
+ *         description: Invalid name
+ *       401:
+ *         description: User not authenticated
+ */
+router.patch('/profile', authenticateJWT, updateProfileValidationRules, validateRequest, updateProfile);
+
+/**
+ * @swagger
+ * /api/v1/auth/change-password:
+ *   patch:
+ *     summary: Change user password
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             currentPassword: oldPassword123
+ *             newPassword: newPassword456#
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *       400:
+ *         description: Invalid password format
+ *       401:
+ *         description: Current password is incorrect
+ */
+router.patch('/change-password', authenticateJWT, changePasswordValidationRules, validateRequest, changePassword);
 
 export default router;

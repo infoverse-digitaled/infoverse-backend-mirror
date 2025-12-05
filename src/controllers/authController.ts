@@ -7,6 +7,21 @@ import { HttpError } from '../utils/httpError';
 import config from '../config';
 import { successResponse } from '../middleware/response';
 import { emailQueue } from '../utils/emailQueue';
+import { isTrialExpired, getSubscriptionTier } from '../utils/subscriptionUtils';
+
+// Extend Request to include user info from auth middleware
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    role: string;
+    subscription?: {
+      plan: 'free' | 'premium';
+      status: 'free' | 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
+      expiresAt?: Date;
+      trialEndsAt?: Date;
+    };
+  };
+}
 
 /**
  * Handles user registration.
@@ -197,6 +212,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
 /**
  * Get current authenticated user's information
+ * Also checks and updates expired trial status automatically.
  */
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -213,7 +229,137 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
       throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
     }
 
+    // Check if trial has expired and update status if needed
+    if (user.subscription?.status === 'trialing' && user.subscription.trialEndsAt) {
+      if (new Date(user.subscription.trialEndsAt) <= new Date()) {
+        user.subscription.status = 'free';
+        user.subscription.plan = 'free';
+        await user.save();
+      }
+    }
+
     successResponse(res, user, 'User retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Complete user onboarding by saving role preference and key stage.
+ * PATCH /api/v1/auth/onboarding
+ */
+export const completeOnboarding = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+
+    if (!user) {
+      throw new HttpError(401, 'UNAUTHORIZED', 'User not authenticated.');
+    }
+
+    const { role, keyStage } = req.body;
+
+    // Validate role
+    const validRoles = ['student', 'instructor'];
+    if (role && !validRoles.includes(role)) {
+      throw new HttpError(400, 'INVALID_ROLE', 'Role must be either "student" or "instructor".');
+    }
+
+    // Validate keyStage
+    const validKeyStages = ['ks1', 'ks2', 'ks3', 'ks4'];
+    if (keyStage && !validKeyStages.includes(keyStage)) {
+      throw new HttpError(400, 'INVALID_KEY_STAGE', 'Key stage must be one of: ks1, ks2, ks3, ks4.');
+    }
+
+    // Update user with onboarding data
+    const updateData: { role?: string; keyStage?: string } = {};
+    if (role) updateData.role = role;
+    if (keyStage) updateData.keyStage = keyStage;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      user.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-passwordHash');
+
+    if (!updatedUser) {
+      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
+    }
+
+    successResponse(res, updatedUser, 'Onboarding completed successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Update user profile (name)
+ * PATCH /api/v1/auth/profile
+ */
+export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+
+    if (!user) {
+      throw new HttpError(401, 'UNAUTHORIZED', 'User not authenticated.');
+    }
+
+    const { name } = req.body;
+
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      throw new HttpError(400, 'INVALID_NAME', 'Name must be at least 2 characters long.');
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      user.id,
+      { $set: { name: name.trim() } },
+      { new: true, runValidators: true }
+    ).select('-passwordHash');
+
+    if (!updatedUser) {
+      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
+    }
+
+    successResponse(res, updatedUser, 'Profile updated successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Change user password
+ * PATCH /api/v1/auth/change-password
+ */
+export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { user } = req as AuthenticatedRequest;
+
+    if (!user) {
+      throw new HttpError(401, 'UNAUTHORIZED', 'User not authenticated.');
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      throw new HttpError(400, 'MISSING_FIELDS', 'Current password and new password are required.');
+    }
+
+    // Get user with password hash
+    const userDoc = await User.findById(user.id);
+    if (!userDoc) {
+      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, userDoc.passwordHash);
+    if (!isMatch) {
+      throw new HttpError(401, 'INVALID_PASSWORD', 'Current password is incorrect.');
+    }
+
+    // Hash and save new password
+    userDoc.passwordHash = await bcrypt.hash(newPassword, 10);
+    await userDoc.save();
+
+    successResponse(res, null, 'Password changed successfully');
   } catch (err) {
     next(err);
   }

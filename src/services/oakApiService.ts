@@ -8,6 +8,7 @@ import {
   LessonDetails,
   Video,
   Quiz,
+  LessonQuiz,
   SearchFilters,
   SearchResults,
   OakApiError,
@@ -390,6 +391,7 @@ export class OakApiService {
 
   /**
    * Get detailed information about a specific lesson
+   * Normalizes Oak API field names to frontend-expected format
    */
   async getLessonDetails(lessonSlug: string): Promise<any> {
     const cacheKey = `oak:lesson:${lessonSlug}:details`;
@@ -400,7 +402,17 @@ export class OakApiService {
       try {
         const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/summary`);
         // Unwrap Oak API response: { data: {...} } -> {...}
-        return this.unwrap<any>(response.data);
+        const lessonData = this.unwrap<any>(response.data);
+
+        // Normalize field names for frontend compatibility
+        return {
+          ...lessonData,
+          slug: lessonSlug,
+          title: lessonData.lessonTitle,
+          description: lessonData.pupilLessonOutcome,
+          lessonNumber: lessonData.lessonOrder || 1,
+          // Keep original fields as well for backwards compatibility
+        };
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -435,8 +447,9 @@ export class OakApiService {
 
   /**
    * Get quiz questions for a lesson
+   * Returns starterQuiz and exitQuiz arrays
    */
-  async getLessonQuiz(lessonSlug: string): Promise<Quiz[]> {
+  async getLessonQuiz(lessonSlug: string): Promise<LessonQuiz> {
     const cacheKey = `oak:lesson:${lessonSlug}:quiz`;
 
     return this.getCached(cacheKey, CACHE_TTL.LESSON_DETAILS, async () => {
@@ -444,8 +457,82 @@ export class OakApiService {
 
       try {
         const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/quiz`);
-        // Unwrap Oak API response: { data: [...] } -> [...]
-        return this.unwrap<Quiz[]>(response.data);
+        // Unwrap Oak API response: { data: { starterQuiz: [...], exitQuiz: [...] } }
+        const quizData = this.unwrap<any>(response.data);
+        return {
+          starterQuiz: quizData.starterQuiz || [],
+          exitQuiz: quizData.exitQuiz || [],
+        };
+      } catch (error) {
+        return this.handleApiError(error);
+      }
+    });
+  }
+
+  /**
+   * Get lesson assets (video, worksheets, slides, etc.)
+   * Rewrites Oak API URLs to use our backend proxy
+   */
+  async getLessonAssets(lessonSlug: string, backendBaseUrl: string = ''): Promise<any> {
+    const cacheKey = `oak:lesson:${lessonSlug}:assets`;
+
+    return this.getCached(cacheKey, CACHE_TTL.LESSON_DETAILS, async () => {
+      this.checkRateLimit();
+
+      try {
+        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/assets`);
+        const data = response.data;
+
+        // Rewrite Oak API URLs to use our backend proxy
+        if (data.assets && Array.isArray(data.assets)) {
+          data.assets = data.assets.map((asset: any) => ({
+            ...asset,
+            // Replace Oak API URL with our backend proxy URL
+            url: `${backendBaseUrl}/api/v1/oak/lessons/${lessonSlug}/assets/${asset.type}`,
+          }));
+        }
+
+        return data;
+      } catch (error) {
+        return this.handleApiError(error);
+      }
+    });
+  }
+
+  /**
+   * Get a specific asset file (video, worksheet, etc.) - streams directly from Oak API
+   */
+  async getAssetFile(lessonSlug: string, assetType: string): Promise<{ stream: any; contentType: string; contentDisposition?: string }> {
+    this.checkRateLimit();
+
+    try {
+      const response = await this.axiosInstance.get(
+        `/lessons/${lessonSlug}/assets/${assetType}`,
+        { responseType: 'stream' }
+      );
+
+      return {
+        stream: response.data,
+        contentType: response.headers['content-type'] || 'application/octet-stream',
+        contentDisposition: response.headers['content-disposition'],
+      };
+    } catch (error) {
+      return this.handleApiError(error);
+    }
+  }
+
+  /**
+   * Get lesson transcript
+   */
+  async getLessonTranscript(lessonSlug: string): Promise<any> {
+    const cacheKey = `oak:lesson:${lessonSlug}:transcript`;
+
+    return this.getCached(cacheKey, CACHE_TTL.LESSON_DETAILS, async () => {
+      this.checkRateLimit();
+
+      try {
+        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/transcript`);
+        return this.unwrap<any>(response.data);
       } catch (error) {
         return this.handleApiError(error);
       }
@@ -541,6 +628,9 @@ export default {
   getLessonDetails: (lessonSlug: string) => getOakApiService().getLessonDetails(lessonSlug),
   getLessonVideo: (lessonSlug: string) => getOakApiService().getLessonVideo(lessonSlug),
   getLessonQuiz: (lessonSlug: string) => getOakApiService().getLessonQuiz(lessonSlug),
+  getLessonAssets: (lessonSlug: string, backendBaseUrl?: string) => getOakApiService().getLessonAssets(lessonSlug, backendBaseUrl),
+  getAssetFile: (lessonSlug: string, assetType: string) => getOakApiService().getAssetFile(lessonSlug, assetType),
+  getLessonTranscript: (lessonSlug: string) => getOakApiService().getLessonTranscript(lessonSlug),
   searchLessons: (query: string, filters?: SearchFilters) => getOakApiService().searchLessons(query, filters),
   clearCache: (pattern: string) => getOakApiService().clearCache(pattern),
   getRateLimitStatus: () => getOakApiService().getRateLimitStatus(),

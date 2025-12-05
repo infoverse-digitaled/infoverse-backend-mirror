@@ -80,20 +80,41 @@ export interface Video {
 }
 
 /**
- * Represents a quiz question
+ * Represents a quiz answer option (from Oak API)
  */
-export interface Quiz {
-  question: string;
-  answers: QuizAnswer[];
-  hint?: string;
+export interface QuizAnswer {
+  type: string;
+  content: string;
+  distractor: boolean;
+  order?: number;
+  matchOption?: { type: string; content: string };
+  correctChoice?: { type: string; content: string };
 }
 
 /**
- * Represents a quiz answer option
+ * Represents a quiz question (from Oak API)
  */
-export interface QuizAnswer {
-  answer: string;
-  correct: boolean;
+export interface QuizQuestion {
+  question: string;
+  questionType: 'multiple-choice' | 'order' | 'match' | 'short-answer' | 'explanatory-text';
+  answers: QuizAnswer[];
+}
+
+/**
+ * Represents the quiz data for a lesson
+ */
+export interface LessonQuiz {
+  starterQuiz: QuizQuestion[];
+  exitQuiz: QuizQuestion[];
+}
+
+/**
+ * @deprecated Use QuizQuestion instead
+ */
+export interface Quiz {
+  question: string;
+  answers: { answer: string; correct: boolean }[];
+  hint?: string;
 }
 
 /**

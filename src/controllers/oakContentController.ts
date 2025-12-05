@@ -3,51 +3,26 @@ import oakApiService from '../services/oakApiService';
 import { successResponse } from '../middleware/response';
 import { HttpError } from '../utils/httpError';
 import { PAID_SUBJECTS, ALLOWED_SUBJECTS } from '../config/curriculum';
+import { isFreeUser as checkIsFreeUser, UserWithSubscription } from '../utils/subscriptionUtils';
 
 // Extend Request to include user info from optionalAuth
 interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
+  user?: UserWithSubscription & {
     name: string;
     email: string;
-    subscription?: {
-      plan: 'free' | 'premium';
-      status: 'active' | 'trialing' | 'inactive' | 'cancelled' | 'past_due' | 'free';
-      expiresAt?: Date;
-      trialEndsAt?: Date;
-    };
   };
 }
 
+/**
+ * Check if user is a free user (uses unified utility)
+ */
 const isFreeUser = (req: AuthenticatedRequest): boolean => {
-  // Check subscription status to determine access level
-  // Premium Access (return false): status is 'active' OR ('trialing' AND not expired)
-  // Restricted Access (return true): all other cases
-
-  if (!req.user) return true;
-  if (!req.user.subscription) return true; // Default to free if missing
-
-  const { status, trialEndsAt } = req.user.subscription;
-
-  // Users with active subscription get full access
-  if (status === 'active') {
-    return false;
-  }
-
-  // Users in trial get full access if the trial hasn't expired
-  if (status === 'trialing') {
-     if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
-       return false;
-     }
-     // Trial expired
-     return true;
-  }
-
-  // All other statuses (free, past_due, cancelled, inactive) are restricted
-  return true;
+  return checkIsFreeUser(req.user);
 };
 
+/**
+ * Get metadata for response (showAds for free users)
+ */
 const getMeta = (req: AuthenticatedRequest) => {
   return {
     showAds: isFreeUser(req),
@@ -124,27 +99,12 @@ export const getUnitDetails = async (req: Request, res: Response, next: NextFunc
 
 /**
  * Get lessons by unit
+ * Note: With 14-day free trial, all users have access to all lessons during trial
  */
 export const getLessons = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { unitSlug } = req.params;
-    let lessons = await oakApiService.getLessons(unitSlug);
-    const freeUser = isFreeUser(req as AuthenticatedRequest);
-
-    if (freeUser && lessons.length > 0) {
-      // Assuming all lessons in the list belong to the same subject
-      // We check the first one to determine the subject
-      const subjectSlug = lessons[0].subjectSlug;
-
-      if (PAID_SUBJECTS.includes(subjectSlug)) {
-        // Paid subject: return 403 or empty.
-        // Prompt says "return empty list or 403". 403 is more informative.
-        throw new HttpError(403, 'This content requires a premium subscription', 'PREMIUM_REQUIRED');
-      } else {
-        // Free subject: return only the first 1 lesson
-        lessons = lessons.slice(0, 1);
-      }
-    }
+    const lessons = await oakApiService.getLessons(unitSlug);
 
     successResponse(res, lessons, 'Lessons retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
   } catch (error) {
@@ -166,7 +126,85 @@ export const getLessonDetails = async (req: Request, res: Response, next: NextFu
 };
 
 /**
+ * Get quiz questions for a lesson
+ */
+export const getLessonQuiz = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lessonSlug } = req.params;
+    const quiz = await oakApiService.getLessonQuiz(lessonSlug);
+    successResponse(res, quiz, 'Quiz retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get lesson assets (video, worksheets, slides)
+ * Rewrites Oak API URLs to use our backend proxy
+ */
+export const getLessonAssets = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lessonSlug } = req.params;
+    // Get the base URL for our backend to rewrite asset URLs
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const backendBaseUrl = `${protocol}://${host}`;
+
+    const assets = await oakApiService.getLessonAssets(lessonSlug, backendBaseUrl);
+    successResponse(res, assets, 'Lesson assets retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Stream/proxy a specific asset file (video, worksheet, etc.)
+ * This proxies the request to Oak API with proper authentication
+ */
+export const getAssetFile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lessonSlug, assetType } = req.params;
+
+    const { stream, contentType, contentDisposition } = await oakApiService.getAssetFile(lessonSlug, assetType);
+
+    // Set response headers
+    res.setHeader('Content-Type', contentType);
+
+    // Allow cross-origin resource sharing for media files
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // For video, enable streaming (no Content-Disposition) and range requests
+    if (assetType === 'video') {
+      res.setHeader('Accept-Ranges', 'bytes');
+      // Don't set Content-Disposition for videos - allow inline playback
+    } else if (contentDisposition) {
+      // For downloadable assets like worksheets, set Content-Disposition
+      res.setHeader('Content-Disposition', contentDisposition);
+    }
+
+    // Pipe the stream directly to the response
+    stream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get lesson transcript
+ */
+export const getLessonTranscript = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lessonSlug } = req.params;
+    const transcript = await oakApiService.getLessonTranscript(lessonSlug);
+    successResponse(res, transcript, 'Lesson transcript retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Search lessons
+ * Filters out paid subject content for free users
  */
 export const searchLessons = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -184,7 +222,30 @@ export const searchLessons = async (req: Request, res: Response, next: NextFunct
       limit: limit ? parseInt(limit as string, 10) : 20,
     };
 
-    const results = await oakApiService.searchLessons(q, filters);
+    let results = await oakApiService.searchLessons(q, filters);
+    const freeUser = isFreeUser(req as AuthenticatedRequest);
+
+    // Filter search results for free users
+    if (freeUser && results && Array.isArray(results.data)) {
+      // Filter out lessons from paid subjects
+      results = {
+        ...results,
+        data: results.data.filter((lesson: any) => {
+          const lessonSubject = lesson.subjectSlug || lesson.subject;
+          return !PAID_SUBJECTS.includes(lessonSubject);
+        }),
+      };
+
+      // Mark any remaining paid content as locked (if it slips through)
+      results.data = results.data.map((lesson: any) => {
+        const lessonSubject = lesson.subjectSlug || lesson.subject;
+        if (PAID_SUBJECTS.includes(lessonSubject)) {
+          return { ...lesson, locked: true };
+        }
+        return lesson;
+      });
+    }
+
     successResponse(res, results, 'Search results retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
   } catch (error) {
     next(error);

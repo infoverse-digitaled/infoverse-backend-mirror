@@ -6,12 +6,19 @@ import {
   enroll,
   updateProgress,
   submitQuiz,
+  getMyProgress,
 } from '../controllers/oakProgressController';
 
 const router = Router();
 
 // Apply auth to all progress routes (must be logged in to track progress)
 router.use(authenticateJWT);
+
+/**
+ * @route GET /progress/my-progress
+ * @desc Get all enrollments and progress for the current user
+ */
+router.get('/my-progress', getMyProgress);
 
 /**
  * @route POST /progress/enroll

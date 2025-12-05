@@ -6,16 +6,64 @@ import Progress from '../models/Progress';
 import { HttpError } from '../utils/httpError';
 import { PAID_SUBJECTS } from '../config/curriculum';
 import { successResponse } from '../middleware/response';
+import { isFreeUser, UserWithSubscription } from '../utils/subscriptionUtils';
 
 interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-    subscription?: {
-      plan: 'free' | 'premium';
-    };
-  };
+  user?: UserWithSubscription;
 }
+
+/**
+ * Get all enrollments and progress for the current user
+ * GET /progress/my-progress
+ */
+export const getMyProgress = async (req: Request, res: Response, next: NextFunction) => {
+  const { user } = req as AuthenticatedRequest;
+  if (!user) {
+    return next(new HttpError(401, 'Unauthorized', 'UNAUTHORIZED'));
+  }
+
+  try {
+    // Get all enrollments for this user
+    const enrollments = await OakEnrollment.find({ userId: user.id }).sort({ lastAccessedAt: -1 });
+
+    // Get progress for each enrollment
+    const enrollmentsWithProgress = await Promise.all(
+      enrollments.map(async (enrollment) => {
+        const progressRecords = await Progress.find({ enrollmentId: enrollment._id });
+
+        // Calculate overall progress
+        const totalLessons = progressRecords.length;
+        const completedLessons = progressRecords.filter(p => p.status === 'completed').length;
+        const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+        return {
+          _id: enrollment._id,
+          subjectSlug: enrollment.subjectSlug,
+          keyStage: enrollment.keyStage,
+          status: enrollment.status,
+          startDate: enrollment.startDate,
+          lastAccessedAt: enrollment.lastAccessedAt,
+          progress: {
+            totalLessons,
+            completedLessons,
+            progressPercent,
+            lessons: progressRecords.map(p => ({
+              lessonSlug: p.lessonSlug,
+              unitSlug: p.unitSlug,
+              status: p.status,
+              quizScore: p.quizScore,
+              completedAt: p.completedAt,
+            })),
+          },
+        };
+      })
+    );
+
+    successResponse(res, enrollmentsWithProgress, 'Progress retrieved successfully');
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * Enroll a user in an Oak National Academy subject/lesson
@@ -29,10 +77,9 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
 
   const { lessonSlug, unitSlug, subjectSlug, keyStage } = req.body;
 
-  // 1. Validation: Freemium Check
+  // 1. Validation: Freemium Check using unified utility
   if (PAID_SUBJECTS.includes(subjectSlug)) {
-    const isFreeUser = !user.subscription || user.subscription.plan === 'free';
-    if (isFreeUser) {
+    if (isFreeUser(user)) {
       return next(
         new HttpError(
           403,
