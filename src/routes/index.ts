@@ -10,6 +10,8 @@ import adminRouter from './adminRoutes';
 import oakContentRouter from './oakContent';
 import oakProgressRouter from './oakProgress';
 import paymentRouter from './payment';
+import contentRouter from './contentRoutes';
+import aiRouter from './aiRoutes';
 
 const router = Router();
 
@@ -31,5 +33,7 @@ router.use('/admin', adminRouter);
 router.use('/oak', oakContentRouter);
 router.use('/progress', oakProgressRouter);
 router.use('/payment', paymentRouter);
+router.use('/content', contentRouter);
+router.use('/ai', aiRouter);
 
 export default router;

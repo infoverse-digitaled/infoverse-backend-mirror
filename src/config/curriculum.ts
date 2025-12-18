@@ -1,5 +1,9 @@
 export const PAID_SUBJECTS = ['german', 'french', 'latin', 'spanish'];
 
+// Blocked subjects - these will be filtered out entirely from all endpoints
+// Used to temporarily remove problematic modules from the platform
+export const BLOCKED_SUBJECTS = ['geography'];
+
 // Allowed subjects per key stage - subjects outside this list will be filtered out
 export const ALLOWED_SUBJECTS: Record<string, string[]> = {
   'ks1': [
@@ -21,7 +25,7 @@ export const ALLOWED_SUBJECTS: Record<string, string[]> = {
     'music',
     'pe',
     'design-technology',
-    'geography',
+    // 'geography', // Temporarily blocked
     'history',
     'religious-education',
   ],
@@ -34,7 +38,7 @@ export const ALLOWED_SUBJECTS: Record<string, string[]> = {
     'music',
     'pe',
     'design-technology',
-    'geography',
+    // 'geography', // Temporarily blocked
     'history',
     'religious-education',
     'french',
@@ -54,7 +58,7 @@ export const ALLOWED_SUBJECTS: Record<string, string[]> = {
     'music',
     'pe',
     'design-technology',
-    'geography',
+    // 'geography', // Temporarily blocked
     'history',
     'religious-education',
     'french',

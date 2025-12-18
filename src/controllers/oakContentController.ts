@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import oakApiService from '../services/oakApiService';
 import { successResponse } from '../middleware/response';
 import { HttpError } from '../utils/httpError';
-import { PAID_SUBJECTS, ALLOWED_SUBJECTS } from '../config/curriculum';
+import { PAID_SUBJECTS, ALLOWED_SUBJECTS, BLOCKED_SUBJECTS } from '../config/curriculum';
 import { isFreeUser as checkIsFreeUser, UserWithSubscription } from '../utils/subscriptionUtils';
 
 // Extend Request to include user info from optionalAuth
@@ -55,7 +55,10 @@ export const getSubjects = async (req: Request, res: Response, next: NextFunctio
     const allowedSubjectsForKeyStage = ALLOWED_SUBJECTS[keyStage] || [];
     subjects = subjects.filter((subject) => allowedSubjectsForKeyStage.includes(subject.slug));
 
-    // Step 2: Lock paid subjects for free users
+    // Step 2: Filter out blocked subjects (safety filter)
+    subjects = subjects.filter((subject) => !BLOCKED_SUBJECTS.includes(subject.slug));
+
+    // Step 3: Lock paid subjects for free users
     const freeUser = isFreeUser(req as AuthenticatedRequest);
     if (freeUser) {
       subjects.forEach((subject) => {

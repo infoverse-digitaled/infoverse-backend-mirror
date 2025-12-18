@@ -99,6 +99,17 @@ const UserSchema = new Schema<IUser>(
         type: Date,
       },
     },
+    // B2B License fields
+    licenseKey: {
+      type: String,
+      required: false,
+      index: true,
+    },
+    organizationName: {
+      type: String,
+      required: false,
+      trim: true,
+    },
     keyStage: {
       type: String,
       required: false,

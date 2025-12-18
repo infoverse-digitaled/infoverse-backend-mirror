@@ -12,6 +12,9 @@ export interface IUser extends Document {
     expiresAt?: Date;
     trialEndsAt?: Date;
   };
+  // B2B License fields
+  licenseKey?: string;
+  organizationName?: string;
   keyStage?: 'ks1' | 'ks2' | 'ks3' | 'ks4';
   yearGroup?: number;
   preferences: {
@@ -90,4 +93,31 @@ export interface IProgress extends Document {
   createdAt: Date;
   updatedAt: Date;
   markCompleted(quizScore?: number): Promise<IProgress>;
+}
+
+// License Batch Interface (B2B School Licensing)
+export interface ILicenseBatch extends Document {
+  schoolName: string;
+  licenseKey: string;
+  maxUsers: number;
+  enrolledCount: number;
+  expiryDate: Date;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Blog Post Interface
+export interface IBlogPost extends Document {
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string;
+  featuredImage?: string;
+  type: 'BLOG' | 'NURTURED';
+  published: boolean;
+  publishedAt?: Date;
+  author: IUser['_id'];
+  createdAt: Date;
+  updatedAt: Date;
 }

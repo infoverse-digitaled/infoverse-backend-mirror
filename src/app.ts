@@ -25,8 +25,24 @@ app.use(statusMonitor());
 app.use(compression());
 
 // Configure CORS to allow requests from the Next.js frontend URL.
+// Support multiple origins for development (localhost) and production (Netlify)
+const allowedOrigins = [
+  config.frontendUrl,
+  'https://infoverse-ed.netlify.app',
+  'http://localhost:3000', // Development
+].filter(Boolean); // Remove any undefined values
+
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/User';
+import LicenseBatch from '../models/LicenseBatch';
 import { HttpError } from '../utils/httpError';
 import config from '../config';
 import { successResponse } from '../middleware/response';
@@ -26,34 +27,89 @@ interface AuthenticatedRequest extends Request {
 /**
  * Handles user registration.
  * It hashes the password, checks for existing users, and creates a new user document.
+ * Supports B2B school licensing via optional licenseKey parameter.
  */
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, email, password } = req.body;
-    
+    const { name, email, password, licenseKey } = req.body;
+
     // Check if a user with the same email already exists.
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       // Use a custom HttpError to handle the response uniformly.
       throw new HttpError(409, 'EMAIL_EXISTS', 'Email already in use.');
     }
-    
+
     // Hash the user's password with a salt round of 10 for security.
     const passwordHash = await bcrypt.hash(password, 10);
-    
-    // Create the new user in the database with a 14-day free trial.
+
+    // Default subscription (14-day trial)
+    let subscriptionData: {
+      status: 'free' | 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
+      plan: 'free' | 'premium';
+      trialEndsAt?: Date;
+    } = {
+      status: 'trialing',
+      plan: 'premium',
+      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+    };
+
+    let userLicenseKey: string | undefined;
+    let organizationName: string | undefined;
+
+    // Handle B2B license registration
+    if (licenseKey) {
+      const license = await LicenseBatch.findOne({
+        licenseKey: licenseKey.toUpperCase().trim()
+      });
+
+      if (!license) {
+        throw new HttpError(400, 'INVALID_LICENSE', 'Invalid license code.');
+      }
+
+      if (!license.isActive) {
+        throw new HttpError(400, 'LICENSE_INACTIVE', 'This license is no longer active.');
+      }
+
+      if (new Date(license.expiryDate) <= new Date()) {
+        throw new HttpError(400, 'LICENSE_EXPIRED', 'This license has expired.');
+      }
+
+      if (license.enrolledCount >= license.maxUsers) {
+        throw new HttpError(400, 'LICENSE_FULL', 'This license has reached its maximum user limit.');
+      }
+
+      // Increment enrolled count
+      license.enrolledCount += 1;
+      await license.save();
+
+      // Set premium subscription without trial (bypasses payment)
+      subscriptionData = {
+        status: 'active',
+        plan: 'premium',
+      };
+
+      userLicenseKey = license.licenseKey;
+      organizationName = license.schoolName;
+    }
+
+    // Create the new user in the database
     const newUser = await User.create({
       name,
       email,
       passwordHash,
-      subscription: {
-        status: 'trialing',
-        plan: 'premium',
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-      },
+      subscription: subscriptionData,
+      licenseKey: userLicenseKey,
+      organizationName,
     });
 
-    successResponse(res, newUser, 'User registered successfully', 201);
+    // Include a flag to indicate if payment should be skipped
+    const responseData = {
+      ...newUser.toObject(),
+      skipPayment: !!licenseKey, // Frontend uses this to redirect directly to dashboard
+    };
+
+    successResponse(res, responseData, 'User registered successfully', 201);
   } catch (err) {
     // Forward the error to the global error handler middleware.
     next(err);
