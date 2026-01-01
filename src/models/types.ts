@@ -23,6 +23,10 @@ export interface IUser extends Document {
   };
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  // Streak tracking
+  lastActiveAt?: Date;
+  activityDates?: Date[];
+  currentStreak?: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { jwtVerify } from 'jose';
 import config from '../config';
-import User from '../models/User'; // Import the User model
+import User from '../models/User';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -29,7 +29,9 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as { userId: string; role: string };
+    const secret = new TextEncoder().encode(config.jwt.secret);
+    const { payload } = await jwtVerify(token, secret);
+    const decoded = payload as { userId: string; role: string };
     const user = await User.findById(decoded.userId);
 
     if (!user) {
@@ -39,7 +41,7 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
     }
 
     req.user = {
-      id: user.id,
+      id: String(user._id),
       role: user.role,
       name: user.name,
       email: user.email,
@@ -69,12 +71,14 @@ export const optionalAuth = async (req: AuthenticatedRequest, res: Response, nex
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as { userId: string; role: string };
+    const secret = new TextEncoder().encode(config.jwt.secret);
+    const { payload } = await jwtVerify(token, secret);
+    const decoded = payload as { userId: string; role: string };
     const user = await User.findById(decoded.userId);
 
     if (user) {
       req.user = {
-        id: user.id,
+        id: String(user._id),
         role: user.role,
         name: user.name,
         email: user.email,

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import { SignJWT } from 'jose';
 import crypto from 'crypto';
 import User from '../models/User';
 import LicenseBatch from '../models/LicenseBatch';
@@ -137,10 +137,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     }
     
     // Create a JSON Web Token with the user's ID and role, expiring in 7 days.
-    const options: SignOptions = {
-      expiresIn: config.jwt.expiresIn as any,
-    };
-    const token = jwt.sign({ userId: user._id, role: user.role }, config.jwt.secret, options);
+    const secret = new TextEncoder().encode(config.jwt.secret);
+    const token = await new SignJWT({ userId: String(user._id), role: user.role })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime(config.jwt.expiresIn)
+      .sign(secret);
 
     // Set the JWT as a secure, HTTP-only cookie.
     // The `httpOnly` flag prevents client-side scripts from accessing the cookie,
@@ -249,9 +250,11 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
 
     // 5. Log the user in by sending a new JWT
-    const token = jwt.sign({ userId: user._id, role: user.role }, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn as any,
-    });
+    const secret = new TextEncoder().encode(config.jwt.secret);
+    const token = await new SignJWT({ userId: String(user._id), role: user.role })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime(config.jwt.expiresIn)
+      .sign(secret);
 
     successResponse(res, { token }, 'Password has been reset successfully.');
 

@@ -21,7 +21,9 @@ interface AppConfig {
     secret: string;
     expiresIn: string;
   };
+  jwtSecret: string; // Shorthand for jwt.secret
   frontendUrl: string;
+  backendUrl: string;
   oak: {
     apiBaseUrl: string;
     apiKey: string;
@@ -90,6 +92,9 @@ const validateConfig = (): AppConfig => {
     throw new Error('Missing required environment variable: REDIS_URL (for production)');
   }
 
+  const frontendUrl = FRONTEND_URL || 'http://localhost:3000';
+  const backendUrl = process.env.BACKEND_URL || `http://localhost:${port}`;
+
   return {
     env,
     port,
@@ -105,7 +110,9 @@ const validateConfig = (): AppConfig => {
       secret: JWT_SECRET,
       expiresIn: JWT_EXPIRES_IN || '1d',
     },
-    frontendUrl: FRONTEND_URL || 'http://localhost:3000',
+    jwtSecret: JWT_SECRET,
+    frontendUrl,
+    backendUrl,
     oak: {
       apiBaseUrl: OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0',
       apiKey: OAK_API_KEY || '',

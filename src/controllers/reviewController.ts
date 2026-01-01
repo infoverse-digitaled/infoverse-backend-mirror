@@ -102,7 +102,7 @@ export const deleteOwnReview = async (req: AuthenticatedRequest, res: Response) 
       throw new HttpError(404, 'Review not found', 'NOT_FOUND');
     }
 
-    if (review.userId !== userId) {
+    if (String(review.userId) !== userId) {
       throw new HttpError(403, 'Forbidden: You can only delete your own reviews', 'FORBIDDEN');
     }
 

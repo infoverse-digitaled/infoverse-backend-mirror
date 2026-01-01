@@ -7,7 +7,69 @@ import { successResponse } from '../middleware/response';
 // Type guard or helper to find plan key from code could be useful,
 // but for now we map all paid plans to 'premium' in the User model.
 
+/**
+ * Start a 14-day cardless free trial
+ * No credit card required - user gets immediate access
+ */
 export const startTrial = async (req: Request, res: Response) => {
+  try {
+    const { planCode } = req.body;
+    const user = (req as any).user;
+
+    if (!user || !user.email) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Check if user already has an active subscription
+    if (user.subscription?.status === 'active') {
+      return res.status(400).json({ error: 'You already have an active subscription' });
+    }
+
+    // Check if user is already trialing
+    if (user.subscription?.status === 'trialing') {
+      const trialEndsAt = user.subscription.trialEndsAt;
+      if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
+        return res.status(400).json({
+          error: 'You already have an active trial',
+          trialEndsAt: trialEndsAt
+        });
+      }
+    }
+
+    // Validate planCode (optional - store for when they convert)
+    if (planCode) {
+      const isValidPlan = Object.values(PAYSTACK_PLANS).some((p) => p.code === planCode);
+      if (!isValidPlan) {
+        return res.status(400).json({ error: 'Invalid plan code' });
+      }
+    }
+
+    // Calculate trial end date (14 days from now)
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+    // Update user with trial subscription
+    await User.findByIdAndUpdate(user.id, {
+      'subscription.status': 'trialing',
+      'subscription.plan': 'premium',
+      'subscription.trialEndsAt': trialEndsAt,
+    });
+
+    res.status(200).json({
+      message: 'Your 14-day free trial has started!',
+      trialEndsAt: trialEndsAt.toISOString(),
+      redirectUrl: '/dashboard',
+    });
+  } catch (error: any) {
+    console.error('Start Trial Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start trial' });
+  }
+};
+
+/**
+ * Start trial with card validation (for immediate subscription after trial)
+ */
+export const startTrialWithCard = async (req: Request, res: Response) => {
   try {
     const { planCode } = req.body;
     const user = (req as any).user;
@@ -35,7 +97,7 @@ export const startTrial = async (req: Request, res: Response) => {
       reference: initializationData.data.reference,
     });
   } catch (error: any) {
-    console.error('Start Trial Error:', error);
+    console.error('Start Trial With Card Error:', error);
     res.status(500).json({ error: error.message || 'Failed to start trial' });
   }
 };

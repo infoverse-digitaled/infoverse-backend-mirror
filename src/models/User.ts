@@ -134,6 +134,16 @@ const UserSchema = new Schema<IUser>(
     },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
+    // Streak tracking
+    lastActiveAt: { type: Date },
+    activityDates: {
+      type: [Date],
+      default: [],
+    },
+    currentStreak: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 );

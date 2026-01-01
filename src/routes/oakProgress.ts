@@ -7,6 +7,8 @@ import {
   updateProgress,
   submitQuiz,
   getMyProgress,
+  recordActivity,
+  getStreak,
 } from '../controllers/oakProgressController';
 
 const router = Router();
@@ -65,5 +67,17 @@ router.post(
   validateRequest,
   submitQuiz
 );
+
+/**
+ * @route POST /progress/activity
+ * @desc Record user activity (for streak tracking)
+ */
+router.post('/activity', recordActivity);
+
+/**
+ * @route GET /progress/streak
+ * @desc Get user's current streak
+ */
+router.get('/streak', getStreak);
 
 export default router;

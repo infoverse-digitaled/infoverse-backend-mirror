@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import statusMonitor from 'express-status-monitor';
 import compression from 'compression';
 import path from 'path';
 import cors from 'cors';
@@ -12,14 +11,12 @@ import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
+import passport from './config/passport';
 
 const app = express();
 
 // Trust proxy for Render/production (required for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
-
-// Use express-status-monitor early in the middleware stack.
-app.use(statusMonitor());
 
 // Gzip compression for all responses. This should be very early.
 app.use(compression());
@@ -29,7 +26,9 @@ app.use(compression());
 const allowedOrigins = [
   config.frontendUrl,
   'https://infoverse-ed.netlify.app',
+  'https://infoversedigitaleducation.net',
   'http://localhost:3000', // Development
+  'http://localhost:3001', // Development (alternate port)
 ].filter(Boolean); // Remove any undefined values
 
 app.use(cors({
@@ -61,6 +60,9 @@ mongoose
 
 // Middleware setup
 setupMiddleware(app);
+
+// Initialize Passport for Google OAuth
+app.use(passport.initialize());
 
 // Apply the general rate limiter to all routes starting with /api/v1
 app.use('/api/v1', apiLimiter);

@@ -3,6 +3,7 @@ import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import OakEnrollment from '../models/OakEnrollment';
 import Progress from '../models/Progress';
+import User from '../models/User';
 import { HttpError } from '../utils/httpError';
 import { PAID_SUBJECTS } from '../config/curriculum';
 import { successResponse } from '../middleware/response';
@@ -245,6 +246,132 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
         status: progress.status
     }, 'Quiz submitted successfully');
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Helper function to calculate streak from activity dates
+ */
+const calculateStreak = (activityDates: Date[]): number => {
+  if (!activityDates || activityDates.length === 0) return 0;
+
+  // Sort dates in descending order (most recent first)
+  const sortedDates = activityDates
+    .map(d => new Date(d))
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  // Normalize to date-only strings for comparison
+  const uniqueDays = [...new Set(sortedDates.map(d => d.toISOString().split('T')[0]))];
+
+  if (uniqueDays.length === 0) return 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  // Check if user was active today or yesterday (streak not broken)
+  if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) {
+    return 0; // Streak broken
+  }
+
+  let streak = 1;
+  for (let i = 0; i < uniqueDays.length - 1; i++) {
+    const current = new Date(uniqueDays[i]);
+    const next = new Date(uniqueDays[i + 1]);
+    const diffDays = Math.round((current.getTime() - next.getTime()) / 86400000);
+
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+};
+
+/**
+ * Record user activity for streak tracking
+ * POST /progress/activity
+ */
+export const recordActivity = async (req: Request, res: Response, next: NextFunction) => {
+  const { user } = req as AuthenticatedRequest;
+  if (!user) {
+    return next(new HttpError(401, 'Unauthorized', 'UNAUTHORIZED'));
+  }
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const userDoc = await User.findById(user.id);
+    if (!userDoc) {
+      return next(new HttpError(404, 'User not found', 'NOT_FOUND'));
+    }
+
+    // Check if we already recorded activity today
+    const activityDates = userDoc.activityDates || [];
+    const lastActivity = activityDates.length > 0 ? new Date(activityDates[activityDates.length - 1]) : null;
+    const lastActivityDay = lastActivity ? lastActivity.toISOString().split('T')[0] : null;
+    const todayStr = today.toISOString().split('T')[0];
+
+    if (lastActivityDay !== todayStr) {
+      // Add today to activity dates
+      activityDates.push(new Date());
+
+      // Keep only last 90 days of activity
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000);
+      const recentDates = activityDates.filter(d => new Date(d) >= ninetyDaysAgo);
+
+      // Calculate new streak
+      const newStreak = calculateStreak(recentDates);
+
+      await User.findByIdAndUpdate(user.id, {
+        lastActiveAt: new Date(),
+        activityDates: recentDates,
+        currentStreak: newStreak,
+      });
+
+      successResponse(res, { streak: newStreak, recorded: true }, 'Activity recorded');
+    } else {
+      // Already recorded today
+      successResponse(res, { streak: userDoc.currentStreak || 0, recorded: false }, 'Activity already recorded today');
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get user's current streak
+ * GET /progress/streak
+ */
+export const getStreak = async (req: Request, res: Response, next: NextFunction) => {
+  const { user } = req as AuthenticatedRequest;
+  if (!user) {
+    return next(new HttpError(401, 'Unauthorized', 'UNAUTHORIZED'));
+  }
+
+  try {
+    const userDoc = await User.findById(user.id);
+    if (!userDoc) {
+      return next(new HttpError(404, 'User not found', 'NOT_FOUND'));
+    }
+
+    // Recalculate streak to ensure accuracy
+    const activityDates = userDoc.activityDates || [];
+    const currentStreak = calculateStreak(activityDates);
+
+    // Update if different
+    if (currentStreak !== userDoc.currentStreak) {
+      await User.findByIdAndUpdate(user.id, { currentStreak });
+    }
+
+    successResponse(res, {
+      streak: currentStreak,
+      lastActiveAt: userDoc.lastActiveAt,
+    }, 'Streak retrieved');
   } catch (error) {
     next(error);
   }

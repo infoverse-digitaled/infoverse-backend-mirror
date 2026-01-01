@@ -6,6 +6,8 @@
  */
 
 import { Router } from 'express';
+import passport from 'passport';
+import jwt from 'jsonwebtoken';
 import { register, login, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
 import {
   loginValidationRules,
@@ -19,6 +21,7 @@ import {
 import validateRequest from '../middleware/validators/validateRequest';
 import { authLimiter } from '../middleware/rateLimiter';
 import { authenticateJWT } from '../middleware/authMiddleware';
+import config from '../config';
 
 const router = Router();
 
@@ -220,5 +223,59 @@ router.patch('/profile', authenticateJWT, updateProfileValidationRules, validate
  *         description: Current password is incorrect
  */
 router.patch('/change-password', authenticateJWT, changePasswordValidationRules, validateRequest, changePassword);
+
+/**
+ * @swagger
+ * /api/v1/auth/google:
+ *   get:
+ *     summary: Initiate Google OAuth login
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirects to Google login page
+ */
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+/**
+ * @swagger
+ * /api/v1/auth/google/callback:
+ *   get:
+ *     summary: Google OAuth callback
+ *     tags: [Auth]
+ *     responses:
+ *       302:
+ *         description: Redirects to frontend with token
+ */
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: `${config.frontendUrl}/login?error=google_auth_failed` }),
+  (req, res) => {
+    try {
+      const user = req.user as any;
+
+      if (!user) {
+        return res.redirect(`${config.frontendUrl}/login?error=no_user`);
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+          subscription: user.subscription,
+        },
+        config.jwtSecret,
+        { expiresIn: '7d' }
+      );
+
+      // Redirect to frontend with token
+      res.redirect(`${config.frontendUrl}/auth/callback?token=${token}`);
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      res.redirect(`${config.frontendUrl}/login?error=callback_error`);
+    }
+  }
+);
 
 export default router;
