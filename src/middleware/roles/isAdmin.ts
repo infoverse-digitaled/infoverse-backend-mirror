@@ -1,16 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
+import { RequestHandler } from 'express';
 import { HttpError } from '../../utils/httpError';
+import { AuthenticatedRequest } from '../authMiddleware';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-    email?: string;
-  };
-}
-
-export const isAdmin = (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
-  if (req.user?.role !== 'admin') {
+export const isAdmin: RequestHandler = (req, _res, next) => {
+  const authReq = req as AuthenticatedRequest;
+  if (authReq.user?.role !== 'admin') {
     throw new HttpError(403, 'Forbidden', 'FORBIDDEN');
   }
   next();

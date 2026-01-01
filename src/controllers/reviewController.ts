@@ -1,19 +1,12 @@
-import { Request, Response } from 'express';
+import { Request, Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
 import redisClient from '../config/redis';
 import { successResponse } from '../middleware/response';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-    email?: string;
-  };
-}
-
-export const getCourseReviews = async (req: Request, res: Response) => {
+export const getCourseReviews: RequestHandler = async (req, res) => {
   const { courseId } = req.params;
   const cacheKey = `reviews:${courseId}`;
 
@@ -25,7 +18,8 @@ export const getCourseReviews = async (req: Request, res: Response) => {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
         const parsedCache = JSON.parse(cachedReviews);
-        return successResponse(res, parsedCache.data, 'Reviews retrieved from cache');
+        successResponse(res, parsedCache.data, 'Reviews retrieved from cache');
+        return;
       }
     }
 
@@ -46,10 +40,11 @@ export const getCourseReviews = async (req: Request, res: Response) => {
   }
 };
 
-export const postReview = async (req: AuthenticatedRequest, res: Response) => {
+export const postReview: RequestHandler = async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
   try {
     const { rating, comment } = req.body;
-    const userId = req.user!.id;
+    const userId = authReq.user!.id;
     const { courseId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
@@ -58,14 +53,14 @@ export const postReview = async (req: AuthenticatedRequest, res: Response) => {
       throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
     const review = await Review.create({ courseId, userId, rating, comment });
-    return successResponse(res, review, 'Review posted successfully', 201);
+    successResponse(res, review, 'Review posted successfully', 201);
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
 };
 
-export const deleteReview = async (req: Request, res: Response) => {
+export const deleteReview: RequestHandler = async (req, res) => {
   const { reviewId } = req.params;
   try {
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {
@@ -87,9 +82,10 @@ export const deleteReview = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteOwnReview = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteOwnReview: RequestHandler = async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
   const { reviewId } = req.params;
-  const userId = req.user!.id;
+  const userId = authReq.user!.id;
 
   try {
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {

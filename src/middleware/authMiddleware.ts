@@ -1,9 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { jwtVerify } from 'jose';
 import config from '../config';
 import User from '../models/User';
 
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     role: string;
@@ -11,19 +11,21 @@ interface AuthenticatedRequest extends Request {
     email: string;
     subscription?: {
       plan: 'free' | 'premium';
-      status: 'active' | 'inactive' | 'cancelled';
+      status: 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due' | 'free';
       expiresAt?: Date;
+      trialEndsAt?: Date;
     };
   };
 }
 
-export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticateJWT: RequestHandler = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
+    res.status(401).json({
       error: { code: 'UNAUTHORIZED', message: 'No token provided' },
     });
+    return;
   }
 
   const token = authHeader.split(' ')[1];
@@ -35,12 +37,13 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
     const user = await User.findById(decoded.userId);
 
     if (!user) {
-      return res.status(401).json({
+      res.status(401).json({
         error: { code: 'UNAUTHORIZED', message: 'User not found' },
       });
+      return;
     }
 
-    req.user = {
+    (req as AuthenticatedRequest).user = {
       id: String(user._id),
       role: user.role,
       name: user.name,
@@ -48,24 +51,27 @@ export const authenticateJWT = async (req: AuthenticatedRequest, res: Response, 
       subscription: user.subscription
         ? {
             plan: user.subscription.plan as 'free' | 'premium',
-            status: user.subscription.status as 'active' | 'inactive' | 'cancelled',
+            status: user.subscription.status as 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due' | 'free',
             expiresAt: user.subscription.expiresAt,
+            trialEndsAt: user.subscription.trialEndsAt,
           }
         : undefined,
     };
     next();
   } catch (err) {
-    return res.status(401).json({
+    res.status(401).json({
       error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token. Please log in again.' },
     });
+    return;
   }
 };
 
-export const optionalAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const optionalAuth: RequestHandler = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next();
+    next();
+    return;
   }
 
   const token = authHeader.split(' ')[1];
@@ -77,7 +83,7 @@ export const optionalAuth = async (req: AuthenticatedRequest, res: Response, nex
     const user = await User.findById(decoded.userId);
 
     if (user) {
-      req.user = {
+      (req as AuthenticatedRequest).user = {
         id: String(user._id),
         role: user.role,
         name: user.name,
@@ -85,8 +91,9 @@ export const optionalAuth = async (req: AuthenticatedRequest, res: Response, nex
         subscription: user.subscription
           ? {
               plan: user.subscription.plan as 'free' | 'premium',
-              status: user.subscription.status as 'active' | 'inactive' | 'cancelled',
+              status: user.subscription.status as 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due' | 'free',
               expiresAt: user.subscription.expiresAt,
+              trialEndsAt: user.subscription.trialEndsAt,
             }
           : undefined,
       };

@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, RequestHandler } from 'express';
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import User from '../models/User';
@@ -7,17 +7,11 @@ import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
 import redisClient from '../config/redis';
 import { successResponse } from '../middleware/response';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-    email?: string;
-  };
-}
-
-export const getUserProfile = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user!.id;
+export const getUserProfile: RequestHandler = async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user!.id;
   const cacheKey = `user:${userId}`;
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
@@ -27,7 +21,8 @@ export const getUserProfile = async (req: AuthenticatedRequest, res: Response) =
       const cachedProfile = await redisClient.get(cacheKey);
       if (cachedProfile) {
         const parsedCache = JSON.parse(cachedProfile);
-        return successResponse(res, parsedCache.data, 'Profile retrieved from cache');
+        successResponse(res, parsedCache.data, 'Profile retrieved from cache');
+        return;
       }
     }
 
@@ -50,8 +45,9 @@ export const getUserProfile = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
-export const updateUserProfile = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user!.id;
+export const updateUserProfile: RequestHandler = async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user!.id;
   const { name, email, currentPassword, newPassword } = req.body;
   const update: { [key: string]: any } = {};
 
@@ -105,8 +101,9 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
   }
 };
 
-export const getUserReviews = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user!.id;
+export const getUserReviews: RequestHandler = async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user!.id;
   const cacheKey = `user:${userId}:reviews`;
   try {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -116,7 +113,8 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
         const parsedCache = JSON.parse(cachedReviews);
-        return successResponse(res, parsedCache.data, 'Reviews retrieved from cache');
+        successResponse(res, parsedCache.data, 'Reviews retrieved from cache');
+        return;
       }
     }
 
@@ -139,8 +137,9 @@ export const getUserReviews = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
-export const getUserEnrollments = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user!.id;
+export const getUserEnrollments: RequestHandler = async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user!.id;
   const cacheKey = `userEnrollments:${userId}`;
 
   try {
@@ -151,7 +150,8 @@ export const getUserEnrollments = async (req: AuthenticatedRequest, res: Respons
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
         const parsedCache = JSON.parse(cachedEnrollments);
-        return successResponse(res, parsedCache.data, 'Enrollments retrieved from cache');
+        successResponse(res, parsedCache.data, 'Enrollments retrieved from cache');
+        return;
       }
     }
 
