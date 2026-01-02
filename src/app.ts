@@ -11,7 +11,6 @@ import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
-import passport from 'passport';
 
 const app = express();
 
@@ -60,9 +59,6 @@ mongoose
 
 // Middleware setup
 setupMiddleware(app);
-
-// Initialize Passport for Google OAuth
-app.use(passport.initialize());
 
 // Apply the general rate limiter to all routes starting with /api/v1
 app.use('/api/v1', apiLimiter);

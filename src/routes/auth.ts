@@ -6,8 +6,6 @@
  */
 
 import { Router } from 'express';
-import passport from 'passport';
-import jwt from 'jsonwebtoken';
 import { register, login, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
 import {
   loginValidationRules,
@@ -231,10 +229,12 @@ router.patch('/change-password', authenticateJWT, changePasswordValidationRules,
  *     summary: Initiate Google OAuth login
  *     tags: [Auth]
  *     responses:
- *       302:
- *         description: Redirects to Google login page
+ *       503:
+ *         description: Google OAuth not configured
  */
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google', (_req, res) => {
+  res.status(503).json({ error: { code: 'OAUTH_NOT_CONFIGURED', message: 'Google sign-in is coming soon' } });
+});
 
 /**
  * @swagger
@@ -243,39 +243,11 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
  *     summary: Google OAuth callback
  *     tags: [Auth]
  *     responses:
- *       302:
- *         description: Redirects to frontend with token
+ *       503:
+ *         description: Google OAuth not configured
  */
-router.get(
-  '/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: `${config.frontendUrl}/login?error=google_auth_failed` }),
-  (req, res) => {
-    try {
-      const user = req.user as any;
-
-      if (!user) {
-        return res.redirect(`${config.frontendUrl}/login?error=no_user`);
-      }
-
-      // Generate JWT token
-      const token = jwt.sign(
-        {
-          id: user._id,
-          email: user.email,
-          role: user.role,
-          subscription: user.subscription,
-        },
-        config.jwtSecret,
-        { expiresIn: '7d' }
-      );
-
-      // Redirect to frontend with token
-      res.redirect(`${config.frontendUrl}/auth/callback?token=${token}`);
-    } catch (error) {
-      console.error('Google OAuth callback error:', error);
-      res.redirect(`${config.frontendUrl}/login?error=callback_error`);
-    }
-  }
-);
+router.get('/google/callback', (_req, res) => {
+  res.redirect(`${config.frontendUrl}/login?error=oauth_not_configured`);
+});
 
 export default router;
