@@ -3,54 +3,62 @@ import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
 import User from '../models/User';
 import config from './index';
 
-// Google OAuth Strategy
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      callbackURL: `${config.backendUrl || 'http://localhost:3000'}/api/v1/auth/google/callback`,
-      scope: ['profile', 'email'],
-    },
-    async (accessToken, refreshToken, profile: Profile, done) => {
-      try {
-        const email = profile.emails?.[0]?.value;
+// Google OAuth Strategy - only register if credentials are provided
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-        if (!email) {
-          return done(new Error('No email found in Google profile'), undefined);
-        }
+if (googleClientId && googleClientSecret) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: googleClientId,
+        clientSecret: googleClientSecret,
+        callbackURL: `${config.backendUrl || 'http://localhost:3000'}/api/v1/auth/google/callback`,
+        scope: ['profile', 'email'],
+      },
+      async (accessToken, refreshToken, profile: Profile, done) => {
+        try {
+          const email = profile.emails?.[0]?.value;
 
-        // Check if user already exists
-        let user = await User.findOne({ email: email.toLowerCase() });
+          if (!email) {
+            return done(new Error('No email found in Google profile'), undefined);
+          }
 
-        if (user) {
-          // User exists - return them
+          // Check if user already exists
+          let user = await User.findOne({ email: email.toLowerCase() });
+
+          if (user) {
+            // User exists - return them
+            return done(null, user);
+          }
+
+          // Create new user with Google profile
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+          user = await User.create({
+            email: email.toLowerCase(),
+            name: profile.displayName || `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`.trim(),
+            passwordHash: '', // No password for OAuth users
+            role: 'student',
+            subscription: {
+              plan: 'premium',
+              status: 'trialing',
+              trialEndsAt,
+            },
+          });
+
           return done(null, user);
+        } catch (error) {
+          return done(error as Error, undefined);
         }
-
-        // Create new user with Google profile
-        const trialEndsAt = new Date();
-        trialEndsAt.setDate(trialEndsAt.getDate() + 14);
-
-        user = await User.create({
-          email: email.toLowerCase(),
-          name: profile.displayName || `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`.trim(),
-          passwordHash: '', // No password for OAuth users
-          role: 'student',
-          subscription: {
-            plan: 'premium',
-            status: 'trialing',
-            trialEndsAt,
-          },
-        });
-
-        return done(null, user);
-      } catch (error) {
-        return done(error as Error, undefined);
       }
-    }
-  )
-);
+    )
+  );
+  console.log('✅ Google OAuth strategy registered');
+} else {
+  console.log('⚠️ Google OAuth credentials not provided - Google sign-in disabled');
+}
 
 // Serialize user for session
 passport.serializeUser((user: any, done) => {
