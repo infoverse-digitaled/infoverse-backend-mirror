@@ -11,7 +11,7 @@ import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
-import passport from './config/passport';
+import passport, { initializeGoogleOAuth } from './config/passport';
 
 const app = express();
 
@@ -53,6 +53,8 @@ mongoose
   .connect(config.mongo.uri)
   .then(() => {
     logger.info('Connected to MongoDB');
+    // Initialize Google OAuth after MongoDB is connected
+    initializeGoogleOAuth();
   })
   .catch((err: Error) => {
     logger.error('MongoDB connection error:', err);

@@ -3,11 +3,21 @@ import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
 import User from '../models/User';
 import config from './index';
 
-// Google OAuth Strategy - only register if credentials are provided
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+let initialized = false;
 
-if (googleClientId && googleClientSecret) {
+// Initialize Google OAuth strategy - called after app setup
+export const initializeGoogleOAuth = () => {
+  if (initialized) return;
+  initialized = true;
+
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!googleClientId || !googleClientSecret) {
+    console.log('⚠️ Google OAuth credentials not provided - Google sign-in disabled');
+    return;
+  }
+
   passport.use(
     new GoogleStrategy(
       {
@@ -55,24 +65,23 @@ if (googleClientId && googleClientSecret) {
       }
     )
   );
+
+  // Serialize user for session
+  passport.serializeUser((user: any, done) => {
+    done(null, user._id || user.id);
+  });
+
+  // Deserialize user from session
+  passport.deserializeUser(async (id: string, done) => {
+    try {
+      const user = await User.findById(id);
+      done(null, user);
+    } catch (error) {
+      done(error, null);
+    }
+  });
+
   console.log('✅ Google OAuth strategy registered');
-} else {
-  console.log('⚠️ Google OAuth credentials not provided - Google sign-in disabled');
-}
-
-// Serialize user for session
-passport.serializeUser((user: any, done) => {
-  done(null, user._id || user.id);
-});
-
-// Deserialize user from session
-passport.deserializeUser(async (id: string, done) => {
-  try {
-    const user = await User.findById(id);
-    done(null, user);
-  } catch (error) {
-    done(error, null);
-  }
-});
+};
 
 export default passport;
