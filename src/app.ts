@@ -12,6 +12,7 @@ import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
 import passport, { initializeGoogleOAuth } from './config/passport';
+import User from './models/User';
 
 const app = express();
 
@@ -54,7 +55,7 @@ mongoose
   .then(() => {
     logger.info('Connected to MongoDB');
     // Initialize Google OAuth after MongoDB is connected
-    initializeGoogleOAuth();
+    initializeGoogleOAuth(User, config.backendUrl);
   })
   .catch((err: Error) => {
     logger.error('MongoDB connection error:', err);

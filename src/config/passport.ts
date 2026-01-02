@@ -1,12 +1,11 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
-import User from '../models/User';
-import config from './index';
 
 let initialized = false;
 
-// Initialize Google OAuth strategy - called after app setup
-export const initializeGoogleOAuth = () => {
+// Initialize Google OAuth strategy - called after app setup and MongoDB connection
+// Takes User model as parameter to avoid circular dependency
+export const initializeGoogleOAuth = (User: any, backendUrl: string) => {
   if (initialized) return;
   initialized = true;
 
@@ -23,7 +22,7 @@ export const initializeGoogleOAuth = () => {
       {
         clientID: googleClientId,
         clientSecret: googleClientSecret,
-        callbackURL: `${config.backendUrl || 'http://localhost:3000'}/api/v1/auth/google/callback`,
+        callbackURL: `${backendUrl}/api/v1/auth/google/callback`,
         scope: ['profile', 'email'],
       },
       async (accessToken, refreshToken, profile: Profile, done) => {
