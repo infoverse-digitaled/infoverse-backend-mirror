@@ -173,12 +173,19 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     // Set response headers
     res.setHeader('Content-Type', contentType);
 
-    // Allow cross-origin resource sharing for media files
+    // CRITICAL: Allow cross-origin resource sharing for media files
+    // These headers are required for video playback from different origins
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
 
     // For video, enable streaming (no Content-Disposition) and range requests
     if (assetType === 'video') {
       res.setHeader('Accept-Ranges', 'bytes');
+      // Enable cross-origin embedding for video elements
+      res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
       // Don't set Content-Disposition for videos - allow inline playback
     } else if (contentDisposition) {
       // For downloadable assets like worksheets, set Content-Disposition
