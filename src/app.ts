@@ -61,7 +61,8 @@ app.use(cors({
 }));
 
 // Handle OPTIONS requests explicitly for all routes
-app.options('*', cors());
+// Express 5.x requires named wildcards - use '{*path}' instead of '*'
+app.options('{*path}', cors());
 
 // Serve static files from the 'public' directory at the root of the project.
 app.use(express.static(path.join(__dirname, '..', 'public')));
