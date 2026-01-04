@@ -1,10 +1,10 @@
 export const PAYSTACK_PLANS = {
   INDIVIDUAL_MONTHLY: {
-    code: 'PLN_ycwo3qwzubzlv3v',
+    code: 'PLN_vnfkw3ejctr7fe4',
     amount: 750000, // ₦7,500
   },
   INDIVIDUAL_ANNUAL: {
-    code: 'PLN_o1rf7r0jl507aoq',
+    code: 'PLN_t56h44wx8f2vcw7',
     amount: 6500000, // ₦65,000
   },
   FAMILY_ANNUAL: {
