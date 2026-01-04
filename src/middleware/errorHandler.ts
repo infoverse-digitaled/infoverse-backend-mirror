@@ -16,6 +16,21 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     });
   }
 
+  // Handle OakApiError and similar errors with statusCode
+  if (err.statusCode && typeof err.statusCode === 'number') {
+    const statusCode = err.statusCode;
+    const code = statusCode === 404 ? 'NOT_FOUND' :
+                 statusCode === 429 ? 'RATE_LIMIT_EXCEEDED' :
+                 'API_ERROR';
+    return res.status(statusCode).json({
+      success: false,
+      error: {
+        code,
+        message: err.message || 'An error occurred',
+      },
+    });
+  }
+
   // For production, send a generic message
   if (config.env === 'production') {
     return res.status(500).json({

@@ -472,6 +472,7 @@ export class OakApiService {
   /**
    * Get lesson assets (video, worksheets, slides, etc.)
    * Rewrites Oak API URLs to use our backend proxy
+   * Note: Not all lessons have assets - returns empty array for 404
    */
   async getLessonAssets(lessonSlug: string, backendBaseUrl: string = ''): Promise<any> {
     const cacheKey = `oak:lesson:${lessonSlug}:assets`;
@@ -493,7 +494,11 @@ export class OakApiService {
         }
 
         return data;
-      } catch (error) {
+      } catch (error: any) {
+        // Handle 404 gracefully - some lessons don't have assets
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          return { assets: [], message: 'No assets available for this lesson' };
+        }
         return this.handleApiError(error);
       }
     });
@@ -502,6 +507,7 @@ export class OakApiService {
   /**
    * Get a specific asset file (video, worksheet, etc.) - streams directly from Oak API
    * NOTE: We explicitly DO NOT pass through Oak API headers to avoid CORS conflicts
+   * Note: Not all lessons have all asset types - throws custom error for 404
    */
   async getAssetFile(lessonSlug: string, assetType: string): Promise<{ stream: any; contentType: string; contentDisposition?: string; contentLength?: string }> {
     this.checkRateLimit();
@@ -543,6 +549,13 @@ export class OakApiService {
         contentLength: response.headers['content-length'],
       };
     } catch (error: any) {
+      // Handle 404 - asset not available for this lesson
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw {
+          message: `Asset '${assetType}' not available for this lesson`,
+          statusCode: 404,
+        } as OakApiError;
+      }
       // Handle redirect errors (302, 307, etc.)
       if (error.response && error.response.status >= 300 && error.response.status < 400) {
         const redirectUrl = error.response.headers.location;
@@ -564,6 +577,7 @@ export class OakApiService {
 
   /**
    * Get lesson transcript
+   * Note: Not all lessons have transcripts - returns null for 404
    */
   async getLessonTranscript(lessonSlug: string): Promise<any> {
     const cacheKey = `oak:lesson:${lessonSlug}:transcript`;
@@ -574,7 +588,11 @@ export class OakApiService {
       try {
         const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/transcript`);
         return this.unwrap<any>(response.data);
-      } catch (error) {
+      } catch (error: any) {
+        // Handle 404 gracefully - some lessons don't have transcripts
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          return { transcript: null, vtt: null, message: 'No transcript available for this lesson' };
+        }
         return this.handleApiError(error);
       }
     });
