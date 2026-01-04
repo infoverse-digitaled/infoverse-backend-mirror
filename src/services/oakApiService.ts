@@ -501,22 +501,63 @@ export class OakApiService {
 
   /**
    * Get a specific asset file (video, worksheet, etc.) - streams directly from Oak API
+   * NOTE: We explicitly DO NOT pass through Oak API headers to avoid CORS conflicts
    */
-  async getAssetFile(lessonSlug: string, assetType: string): Promise<{ stream: any; contentType: string; contentDisposition?: string }> {
+  async getAssetFile(lessonSlug: string, assetType: string): Promise<{ stream: any; contentType: string; contentDisposition?: string; contentLength?: string }> {
     this.checkRateLimit();
 
     try {
       const response = await this.axiosInstance.get(
         `/lessons/${lessonSlug}/assets/${assetType}`,
-        { responseType: 'stream' }
+        {
+          responseType: 'stream',
+          // Don't follow redirects automatically - we need to handle them
+          maxRedirects: 0,
+          validateStatus: (status) => status >= 200 && status < 400,
+        }
       );
+
+      // If Oak API returns a redirect, follow it manually with our own request
+      if (response.status >= 300 && response.status < 400 && response.headers.location) {
+        const axios = require('axios');
+        const redirectResponse = await axios.get(response.headers.location, {
+          responseType: 'stream',
+          headers: {
+            // Don't send our Oak API key to external CDNs
+          }
+        });
+        return {
+          stream: redirectResponse.data,
+          contentType: redirectResponse.headers['content-type'] || 'video/mp4',
+          contentLength: redirectResponse.headers['content-length'],
+        };
+      }
 
       return {
         stream: response.data,
-        contentType: response.headers['content-type'] || 'application/octet-stream',
+        // For videos, default to video/mp4 for better browser compatibility
+        contentType: assetType === 'video'
+          ? 'video/mp4'
+          : (response.headers['content-type'] || 'application/octet-stream'),
         contentDisposition: response.headers['content-disposition'],
+        contentLength: response.headers['content-length'],
       };
-    } catch (error) {
+    } catch (error: any) {
+      // Handle redirect errors (302, 307, etc.)
+      if (error.response && error.response.status >= 300 && error.response.status < 400) {
+        const redirectUrl = error.response.headers.location;
+        if (redirectUrl) {
+          const axios = require('axios');
+          const redirectResponse = await axios.get(redirectUrl, {
+            responseType: 'stream',
+          });
+          return {
+            stream: redirectResponse.data,
+            contentType: redirectResponse.headers['content-type'] || 'video/mp4',
+            contentLength: redirectResponse.headers['content-length'],
+          };
+        }
+      }
       return this.handleApiError(error);
     }
   }

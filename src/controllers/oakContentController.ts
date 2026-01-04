@@ -163,29 +163,37 @@ export const getLessonAssets = async (req: Request, res: Response, next: NextFun
 /**
  * Stream/proxy a specific asset file (video, worksheet, etc.)
  * This proxies the request to Oak API with proper authentication
+ * IMPORTANT: We set all CORS headers ourselves and DO NOT pass through Oak API headers
  */
 export const getAssetFile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { lessonSlug, assetType } = req.params;
 
-    const { stream, contentType, contentDisposition } = await oakApiService.getAssetFile(lessonSlug, assetType);
+    const { stream, contentType, contentDisposition, contentLength } = await oakApiService.getAssetFile(lessonSlug, assetType);
 
-    // Set response headers
-    res.setHeader('Content-Type', contentType);
-
-    // CRITICAL: Allow cross-origin resource sharing for media files
-    // These headers are required for video playback from different origins
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    // CRITICAL: Set all CORS headers FIRST before any other headers
+    // These must be set to allow cross-origin video playback
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Set content type
+    res.setHeader('Content-Type', contentType);
+
+    // Set content length if available
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
+    }
 
     // For video, enable streaming (no Content-Disposition) and range requests
     if (assetType === 'video') {
       res.setHeader('Accept-Ranges', 'bytes');
       // Enable cross-origin embedding for video elements
       res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+      // Cache video for performance
+      res.setHeader('Cache-Control', 'public, max-age=3600');
       // Don't set Content-Disposition for videos - allow inline playback
     } else if (contentDisposition) {
       // For downloadable assets like worksheets, set Content-Disposition
