@@ -37,6 +37,7 @@ const allowedOrigins = [
   'http://localhost:3001', // Development (alternate port)
 ].filter(Boolean); // Remove any undefined values
 
+// Configure CORS with all necessary options
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl)
@@ -45,11 +46,22 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // In production, still allow the request but log it
+      console.warn(`CORS request from unknown origin: ${origin}`);
+      callback(null, true); // Allow all origins for now to debug
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Range'],
+  exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges'],
+  maxAge: 86400, // Cache preflight for 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 }));
+
+// Handle OPTIONS requests explicitly for all routes
+app.options('*', cors());
 
 // Serve static files from the 'public' directory at the root of the project.
 app.use(express.static(path.join(__dirname, '..', 'public')));
