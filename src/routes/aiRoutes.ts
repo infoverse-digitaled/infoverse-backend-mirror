@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { tutorQuestion, summarizeContent, explainConcept } from '../controllers/aiController';
-import { authenticateJWT } from '../middleware/authMiddleware';
+import { authenticateJWT, requireActiveSubscription } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -59,7 +59,7 @@ const router = Router();
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/tutor', authenticateJWT, tutorQuestion);
+router.post('/tutor', authenticateJWT, requireActiveSubscription, tutorQuestion);
 
 /**
  * @swagger
@@ -91,7 +91,7 @@ router.post('/tutor', authenticateJWT, tutorQuestion);
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/summary', authenticateJWT, summarizeContent);
+router.post('/summary', authenticateJWT, requireActiveSubscription, summarizeContent);
 
 /**
  * @swagger
@@ -126,6 +126,6 @@ router.post('/summary', authenticateJWT, summarizeContent);
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/explain', authenticateJWT, explainConcept);
+router.post('/explain', authenticateJWT, requireActiveSubscription, explainConcept);
 
 export default router;

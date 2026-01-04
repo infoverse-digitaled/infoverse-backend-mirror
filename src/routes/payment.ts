@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { startTrial, verifyTrial, getPricing } from '../controllers/paymentController';
+import { startTrial, verifyTrial, getPricing, initializePayment, verifyPayment } from '../controllers/paymentController';
 import { handleWebhook } from '../controllers/webhookController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 
@@ -12,5 +12,7 @@ router.post('/webhook', handleWebhook);
 // Protected routes
 router.post('/start-trial', authenticateJWT, startTrial);
 router.post('/verify-trial', authenticateJWT, verifyTrial);
+router.post('/initialize', authenticateJWT, initializePayment);
+router.post('/verify', authenticateJWT, verifyPayment);
 
 export default router;

@@ -1,17 +1,17 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { HttpError } from '../utils/httpError';
 import logger from '../utils/logger';
 
 // Initialize Gemini client
-let genAI: GoogleGenAI | null = null;
+let genAI: GoogleGenerativeAI | null = null;
 
-const getGeminiClient = (): GoogleGenAI => {
+const getGeminiClient = (): GoogleGenerativeAI => {
   if (!genAI) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new HttpError(500, 'AI_NOT_CONFIGURED', 'Gemini API key is not configured.');
     }
-    genAI = new GoogleGenAI({ apiKey });
+    genAI = new GoogleGenerativeAI(apiKey);
   }
   return genAI;
 };
@@ -57,6 +57,7 @@ export const askTutor = async (
 
   try {
     const client = getGeminiClient();
+    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const prompt = `You are a helpful AI tutor for UK National Curriculum students.
 Your role is to help students understand their lessons better.
@@ -77,12 +78,9 @@ INSTRUCTIONS:
 
 Please answer the student's question:`;
 
-    const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
-
-    const text = response.text;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
     if (!text) {
       throw new HttpError(500, 'AI_EMPTY_RESPONSE', 'AI did not return a response.');
@@ -94,7 +92,16 @@ Please answer the student's question:`;
     if (error instanceof HttpError) {
       throw error;
     }
-    logger.error('Gemini API error:', error);
+    // Log detailed error info including cause chain
+    logger.error('Gemini API error:', {
+      message: error?.message,
+      name: error?.name,
+      cause: error?.cause?.message || error?.cause,
+      causeCode: error?.cause?.code,
+      errno: error?.cause?.errno,
+      syscall: error?.cause?.syscall,
+      stack: error?.stack?.split('\n').slice(0, 5).join('\n')
+    });
     throw new HttpError(500, 'AI_ERROR', 'Failed to generate AI response. Please try again.');
   }
 };
@@ -113,6 +120,7 @@ export const generateSummary = async (
 
   try {
     const client = getGeminiClient();
+    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const prompt = `You are an educational content summarizer for UK National Curriculum students.
 
@@ -128,12 +136,9 @@ INSTRUCTIONS:
 
 Generate a summary:`;
 
-    const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
-
-    const text = response.text;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
     if (!text) {
       throw new HttpError(500, 'AI_EMPTY_RESPONSE', 'AI did not return a response.');
@@ -164,6 +169,7 @@ export const explainSimply = async (
 
   try {
     const client = getGeminiClient();
+    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const prompt = `You are an educational assistant helping students understand difficult concepts.
 
@@ -182,12 +188,9 @@ INSTRUCTIONS:
 
 Explain the concept:`;
 
-    const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-    });
-
-    const text = response.text;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
     if (!text) {
       throw new HttpError(500, 'AI_EMPTY_RESPONSE', 'AI did not return a response.');

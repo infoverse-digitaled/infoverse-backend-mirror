@@ -131,6 +131,92 @@ export const verifyTrial = async (req: Request, res: Response) => {
 };
 
 /**
+ * Verify a direct payment (subscription auto-created by Paystack)
+ */
+export const verifyPayment = async (req: Request, res: Response) => {
+  try {
+    const { reference } = req.body;
+    const user = (req as any).user;
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!reference) {
+      return res.status(400).json({ error: 'Payment reference is required' });
+    }
+
+    // Just verify the transaction - subscription is already created by Paystack
+    const verificationResult = await paystackService.verifyPayment(reference);
+
+    if (!verificationResult.success) {
+      return res.status(400).json({ error: 'Payment verification failed' });
+    }
+
+    // Update User to active status
+    await User.findByIdAndUpdate(user.id, {
+      'subscription.status': 'active',
+      'subscription.plan': 'premium',
+      'subscription.trialEndsAt': null, // Clear trial end date
+    });
+
+    res.status(200).json({
+      message: 'Payment verified successfully! Your subscription is now active.',
+      success: true,
+    });
+  } catch (error: any) {
+    console.error('Verify Payment Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to verify payment' });
+  }
+};
+
+/**
+ * Initialize direct payment (skip trial, pay with card immediately)
+ */
+export const initializePayment = async (req: Request, res: Response) => {
+  try {
+    const { planCode } = req.body;
+    const user = (req as any).user;
+
+    if (!user || !user.email) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Validate planCode and get amount
+    let planAmount: number | null = null;
+    for (const plan of Object.values(PAYSTACK_PLANS)) {
+      if (plan.code === planCode) {
+        planAmount = plan.amount;
+        break;
+      }
+    }
+
+    if (!planAmount) {
+      return res.status(400).json({ error: 'Invalid plan code' });
+    }
+
+    // Get callback URL from environment or use default
+    const callbackUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/callback`;
+
+    const initializationData = await paystackService.initializePayment(
+      user.email,
+      planCode,
+      planAmount,
+      callbackUrl
+    );
+
+    res.status(200).json({
+      message: 'Payment initialized',
+      authorization_url: initializationData.data.authorization_url,
+      reference: initializationData.data.reference,
+    });
+  } catch (error: any) {
+    console.error('Initialize Payment Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to initialize payment' });
+  }
+};
+
+/**
  * Get available pricing plans
  * Public endpoint - no authentication required
  */

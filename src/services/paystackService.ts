@@ -30,6 +30,39 @@ export const initializeCardValidation = async (email: string, planCode: string) 
   }
 };
 
+/**
+ * Initialize a direct payment transaction (skip trial, pay immediately)
+ */
+export const initializePayment = async (
+  email: string,
+  planCode: string,
+  amount: number,
+  callbackUrl: string
+) => {
+  try {
+    const response = await axios.post(
+      `${PAYSTACK_BASE_URL}/transaction/initialize`,
+      {
+        email,
+        amount, // Amount in kobo
+        plan: planCode,
+        callback_url: callbackUrl,
+        metadata: {
+          planCode,
+          paymentType: 'direct', // Flag to distinguish from trial
+        },
+      },
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const verifyAndCreateTrial = async (reference: string) => {
   try {
     // 1. Verify Transaction
@@ -71,6 +104,36 @@ export const verifyAndCreateTrial = async (reference: string) => {
     );
 
     return subscriptionResponse.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Verify a payment transaction (for direct payments where subscription is auto-created)
+ */
+export const verifyPayment = async (reference: string) => {
+  try {
+    const verifyResponse = await axios.get(
+      `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+
+    const transactionData = verifyResponse.data.data;
+
+    if (transactionData.status !== 'success') {
+      throw new Error('Transaction verification failed');
+    }
+
+    return {
+      success: true,
+      data: transactionData,
+      planCode: transactionData.metadata?.planCode,
+      paymentType: transactionData.metadata?.paymentType,
+      email: transactionData.customer?.email,
+    };
   } catch (error) {
     throw error;
   }

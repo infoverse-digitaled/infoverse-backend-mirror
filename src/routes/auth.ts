@@ -6,6 +6,8 @@
  */
 
 import { Router } from 'express';
+import passport from 'passport';
+import { SignJWT } from 'jose';
 import { register, login, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
 import {
   loginValidationRules,
@@ -229,11 +231,19 @@ router.patch('/change-password', authenticateJWT, changePasswordValidationRules,
  *     summary: Initiate Google OAuth login
  *     tags: [Auth]
  *     responses:
+ *       302:
+ *         description: Redirects to Google OAuth consent screen
  *       503:
  *         description: Google OAuth not configured
  */
-router.get('/google', (_req, res) => {
-  res.status(503).json({ error: { code: 'OAUTH_NOT_CONFIGURED', message: 'Google sign-in is coming soon' } });
+router.get('/google', (req, res, next) => {
+  // Check if Google OAuth is configured
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({
+      error: { code: 'OAUTH_NOT_CONFIGURED', message: 'Google sign-in is not configured' }
+    });
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
 /**
@@ -243,11 +253,31 @@ router.get('/google', (_req, res) => {
  *     summary: Google OAuth callback
  *     tags: [Auth]
  *     responses:
- *       503:
- *         description: Google OAuth not configured
+ *       302:
+ *         description: Redirects to frontend with token or error
  */
-router.get('/google/callback', (_req, res) => {
-  res.redirect(`${config.frontendUrl}/login?error=oauth_not_configured`);
+router.get('/google/callback', (req, res, next) => {
+  passport.authenticate('google', { session: false }, async (err: Error | null, user: any) => {
+    if (err || !user) {
+      const errorMessage = err?.message || 'Authentication failed';
+      return res.redirect(`${config.frontendUrl}/login?error=${encodeURIComponent(errorMessage)}`);
+    }
+
+    try {
+      // Generate JWT token for the user (using jose library like authController)
+      const secret = new TextEncoder().encode(config.jwt.secret);
+      const token = await new SignJWT({ userId: String(user._id), role: user.role })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime(config.jwt.expiresIn)
+        .sign(secret);
+
+      // Redirect to frontend with token
+      res.redirect(`${config.frontendUrl}/auth/callback?token=${token}`);
+    } catch (tokenError) {
+      console.error('Token generation error:', tokenError);
+      res.redirect(`${config.frontendUrl}/login?error=token_generation_failed`);
+    }
+  })(req, res, next);
 });
 
 export default router;

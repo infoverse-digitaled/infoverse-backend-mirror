@@ -1,3 +1,7 @@
+// IMPORTANT: Fetch polyfill must be loaded FIRST before any other imports
+// This fixes "fetch failed" errors with Google AI SDK on Node.js
+import './utils/fetchPolyfill';
+
 import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import compression from 'compression';
@@ -11,6 +15,9 @@ import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
+import passport from 'passport';
+import User from './models/User';
+import { initializeGoogleOAuth } from './config/passport';
 
 const app = express();
 
@@ -52,6 +59,8 @@ mongoose
   .connect(config.mongo.uri)
   .then(() => {
     logger.info('Connected to MongoDB');
+    // Initialize Google OAuth after MongoDB is ready
+    initializeGoogleOAuth(User, config.backendUrl);
   })
   .catch((err: Error) => {
     logger.error('MongoDB connection error:', err);
@@ -59,6 +68,9 @@ mongoose
 
 // Middleware setup
 setupMiddleware(app);
+
+// Initialize Passport
+app.use(passport.initialize());
 
 // Apply the general rate limiter to all routes starting with /api/v1
 app.use('/api/v1', apiLimiter);
