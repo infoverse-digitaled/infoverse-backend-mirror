@@ -39,7 +39,25 @@ export const initializeGoogleOAuth = (User: any, backendUrl: string) => {
           let user = await User.findOne({ email: email.toLowerCase() });
 
           if (user) {
-            // User exists - return them
+            // User exists - check if they need a trial reset
+            // If user has no active subscription and no trial, give them a fresh trial
+            const needsTrial = !user.subscription ||
+              (user.subscription.status !== 'active' && user.subscription.status !== 'trialing');
+
+            if (needsTrial) {
+              // Reset to fresh 14-day trial for returning users without active subscription
+              const trialEndsAt = new Date();
+              trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+              user.subscription = {
+                plan: 'premium',
+                status: 'trialing',
+                trialEndsAt,
+              };
+              await user.save();
+              console.log(`[OAuth] Reset trial for existing user: ${user.email}`);
+            }
+
             return done(null, user);
           }
 
