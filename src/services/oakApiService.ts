@@ -120,7 +120,18 @@ export class OakApiService {
       try {
         const cached = await this.redis.get(cacheKey);
         if (cached) {
-          return JSON.parse(cached) as T;
+          // RELIABILITY FIX: Wrap JSON.parse in try-catch to handle corrupted cache
+          try {
+            return JSON.parse(cached) as T;
+          } catch (parseError) {
+            console.error(`Cache parse error for key ${cacheKey}, clearing corrupted cache:`, parseError);
+            // Delete corrupted cache entry and fall through to fetch fresh data
+            try {
+              await this.redis.del(cacheKey);
+            } catch (delError) {
+              console.error(`Failed to delete corrupted cache key ${cacheKey}:`, delError);
+            }
+          }
         }
       } catch (error) {
         console.error(`Cache get error for key ${cacheKey}:`, error);
@@ -223,6 +234,12 @@ export class OakApiService {
         const response = await this.axiosInstance.get<any>('/subjects');
         const allSubjects = this.unwrap<any[]>(response.data);
 
+        // RELIABILITY FIX: Validate array before operations
+        if (!allSubjects || !Array.isArray(allSubjects)) {
+          console.warn('Expected array from subjects API, got:', typeof allSubjects);
+          return [];
+        }
+
         // Filter subjects that have the requested key stage
         const filteredSubjects = allSubjects
           .filter((subject) => {
@@ -260,6 +277,12 @@ export class OakApiService {
         const subjectResponse = await this.axiosInstance.get<any>(`/subjects/${subjectSlug}`);
         const subjectData = this.unwrap<any>(subjectResponse.data);
 
+        // RELIABILITY FIX: Validate subjectData exists
+        if (!subjectData) {
+          console.warn(`No subject data returned for ${subjectSlug}`);
+          return [];
+        }
+
         // Step 2: Find the sequence that matches the requested key stage
         const matchingSequence = subjectData.sequenceSlugs?.find((seq: any) =>
           seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage)
@@ -276,6 +299,12 @@ export class OakApiService {
         );
         const yearlyUnits = this.unwrap<any[]>(unitsResponse.data);
 
+        // RELIABILITY FIX: Validate yearlyUnits is an array
+        if (!yearlyUnits || !Array.isArray(yearlyUnits)) {
+          console.warn(`Expected array from units API for sequence ${matchingSequence.sequenceSlug}, got:`, typeof yearlyUnits);
+          return [];
+        }
+
         // Step 4: Flatten and normalize the units array (units are grouped by year)
         const allUnits: any[] = [];
         yearlyUnits.forEach((yearGroup: any) => {
@@ -287,8 +316,8 @@ export class OakApiService {
                 allUnits.push({
                   ...unit,
                   slug: unit.unitSlug, // Normalized slug
-                  title: unit.unitTitle, // Normalized title
-                  unitNumber: unit.unitOrder, // Frontend expects unitNumber
+                  title: unit.unitTitle || 'Untitled Unit', // RELIABILITY FIX: Default title
+                  unitNumber: unit.unitOrder ?? 0, // RELIABILITY FIX: Default to 0 if undefined
                   subjectSlug: subjectSlug, // Add subject context
                   keyStageSlug: keyStage, // Add key stage context
                   year: yearGroup.year, // Add year information
@@ -299,18 +328,20 @@ export class OakApiService {
               } else if (unit.unitOptions && Array.isArray(unit.unitOptions)) {
                 // Multi-option unit - expand each option as a separate unit
                 unit.unitOptions.forEach((option: any, index: number) => {
+                  // RELIABILITY FIX: Use nullish coalescing for safe defaults
+                  const baseOrder = unit.unitOrder ?? 0;
                   allUnits.push({
-                    unitTitle: option.unitTitle,
+                    unitTitle: option.unitTitle || 'Untitled Unit',
                     unitSlug: option.unitSlug,
-                    unitOrder: unit.unitOrder + (index * 0.1), // Maintain order but distinguish options
+                    unitOrder: baseOrder + (index * 0.1), // Maintain order but distinguish options
                     slug: option.unitSlug,
-                    title: option.unitTitle,
-                    unitNumber: unit.unitOrder,
+                    title: option.unitTitle || 'Untitled Unit',
+                    unitNumber: baseOrder,
                     subjectSlug: subjectSlug,
                     keyStageSlug: keyStage,
                     year: yearGroup.year,
                     isOption: true, // Mark as an option unit
-                    parentUnitTitle: unit.unitTitle, // Reference to parent
+                    parentUnitTitle: unit.unitTitle || 'Unknown', // Reference to parent
                     threads: unit.threads, // Inherit threads from parent
                     numberOfLessons: undefined,
                   });
@@ -370,12 +401,25 @@ export class OakApiService {
         const response = await this.axiosInstance.get<any>(`/units/${unitSlug}/summary`);
         const unitData = this.unwrap<any>(response.data);
 
+        // RELIABILITY FIX: Validate unitData exists
+        if (!unitData) {
+          console.warn(`No unit data returned for ${unitSlug}`);
+          return [];
+        }
+
         // Extract subject and keystage information from unit summary
-        const subjectSlug = unitData.subjectSlug;
-        const keyStageSlug = unitData.keyStageSlug;
+        const subjectSlug = unitData.subjectSlug || '';
+        const keyStageSlug = unitData.keyStageSlug || '';
 
         // Extract and normalize lessons from the unit summary
         const lessons = unitData.unitLessons || [];
+
+        // RELIABILITY FIX: Validate lessons is an array
+        if (!Array.isArray(lessons)) {
+          console.warn(`Expected lessons array for unit ${unitSlug}, got:`, typeof lessons);
+          return [];
+        }
+
         return lessons.map((lesson: any) => ({
           ...lesson,
           slug: lesson.lessonSlug, // Add normalized 'slug' field for frontend compatibility
@@ -404,13 +448,24 @@ export class OakApiService {
         // Unwrap Oak API response: { data: {...} } -> {...}
         const lessonData = this.unwrap<any>(response.data);
 
+        // RELIABILITY FIX: Validate lessonData exists
+        if (!lessonData) {
+          console.warn(`No lesson data returned for ${lessonSlug}`);
+          return {
+            slug: lessonSlug,
+            title: 'Unknown Lesson',
+            description: '',
+            lessonNumber: 1,
+          };
+        }
+
         // Normalize field names for frontend compatibility
         return {
           ...lessonData,
           slug: lessonSlug,
-          title: lessonData.lessonTitle,
-          description: lessonData.pupilLessonOutcome,
-          lessonNumber: lessonData.lessonOrder || 1,
+          title: lessonData.lessonTitle || 'Untitled Lesson', // RELIABILITY FIX: Default title
+          description: lessonData.pupilLessonOutcome || '', // RELIABILITY FIX: Default description
+          lessonNumber: lessonData.lessonOrder ?? 1, // RELIABILITY FIX: Default to 1
           // Keep original fields as well for backwards compatibility
         };
       } catch (error) {

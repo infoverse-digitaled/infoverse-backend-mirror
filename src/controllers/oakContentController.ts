@@ -173,7 +173,9 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
 
     // CRITICAL: Set all CORS headers FIRST before any other headers
     // These must be set to allow cross-origin video playback
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // SECURITY FIX: Use requesting origin instead of wildcard
+    const requestOrigin = req.headers.origin || 'https://infoversedigitaleducation.net';
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
@@ -199,6 +201,18 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
       // For downloadable assets like worksheets, set Content-Disposition
       res.setHeader('Content-Disposition', contentDisposition);
     }
+
+    // RELIABILITY FIX: Add error handlers before piping
+    stream.on('error', (err: Error) => {
+      console.error('Stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Stream failed', message: err.message });
+      }
+    });
+    res.on('error', (err: Error) => {
+      console.error('Response error:', err);
+      stream.destroy();
+    });
 
     // Pipe the stream directly to the response
     stream.pipe(res);
@@ -232,12 +246,16 @@ export const searchLessons = async (req: Request, res: Response, next: NextFunct
       throw new HttpError(400, 'Search query "q" is required', 'BAD_REQUEST');
     }
 
+    // RELIABILITY FIX: Add bounds checking on pagination
+    const parsedPage = Math.max(parseInt(page as string, 10) || 1, 1);
+    const parsedLimit = Math.min(Math.max(parseInt(limit as string, 10) || 20, 1), 100);
+
     const filters = {
       keyStage: keyStage as string,
       subjectSlug: subject as string,
       yearSlug: year as string,
-      page: page ? parseInt(page as string, 10) : 1,
-      limit: limit ? parseInt(limit as string, 10) : 20,
+      page: parsedPage,
+      limit: parsedLimit,
     };
 
     let results = await oakApiService.searchLessons(q, filters);
@@ -246,17 +264,20 @@ export const searchLessons = async (req: Request, res: Response, next: NextFunct
     // Filter search results for free users
     if (freeUser && results && Array.isArray(results.data)) {
       // Filter out lessons from paid subjects
+      // RELIABILITY FIX: Handle missing subject fields
       results = {
         ...results,
         data: results.data.filter((lesson: any) => {
-          const lessonSubject = lesson.subjectSlug || lesson.subject;
+          const lessonSubject = lesson.subjectSlug || lesson.subject || '';
+          // Block if subject is unknown (could be paid content)
+          if (!lessonSubject) return false;
           return !PAID_SUBJECTS.includes(lessonSubject);
         }),
       };
 
       // Mark any remaining paid content as locked (if it slips through)
       results.data = results.data.map((lesson: any) => {
-        const lessonSubject = lesson.subjectSlug || lesson.subject;
+        const lessonSubject = lesson.subjectSlug || lesson.subject || '';
         if (PAID_SUBJECTS.includes(lessonSubject)) {
           return { ...lesson, locked: true };
         }

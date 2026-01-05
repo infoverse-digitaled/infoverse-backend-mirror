@@ -15,9 +15,6 @@ import { setupSwagger } from './swagger';
 import startServer from './server';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
-import passport from 'passport';
-import User from './models/User';
-import { initializeGoogleOAuth } from './config/passport';
 
 const app = express();
 
@@ -46,9 +43,9 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      // In production, still allow the request but log it
-      console.warn(`CORS request from unknown origin: ${origin}`);
-      callback(null, true); // Allow all origins for now to debug
+      // SECURITY FIX: Reject unknown origins to prevent CSRF attacks
+      console.warn(`CORS request BLOCKED from unknown origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
@@ -72,8 +69,6 @@ mongoose
   .connect(config.mongo.uri)
   .then(() => {
     logger.info('Connected to MongoDB');
-    // Initialize Google OAuth after MongoDB is ready
-    initializeGoogleOAuth(User, config.backendUrl);
   })
   .catch((err: Error) => {
     logger.error('MongoDB connection error:', err);
@@ -81,9 +76,6 @@ mongoose
 
 // Middleware setup
 setupMiddleware(app);
-
-// Initialize Passport
-app.use(passport.initialize());
 
 // Apply the general rate limiter to all routes starting with /api/v1
 app.use('/api/v1', apiLimiter);
