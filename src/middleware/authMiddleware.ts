@@ -21,14 +21,23 @@ export interface AuthenticatedRequest extends Request {
 export const authenticateJWT: RequestHandler = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // Support token from query parameter (for video/media elements that can't send headers)
+  const queryToken = req.query.token as string | undefined;
+
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (queryToken) {
+    token = queryToken;
+  }
+
+  if (!token) {
     res.status(401).json({
       error: { code: 'UNAUTHORIZED', message: 'No token provided' },
     });
     return;
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const secret = new TextEncoder().encode(config.jwt.secret);

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getKeyStages,
   getSubjects,
@@ -15,6 +15,17 @@ import {
 import { optionalAuth, authenticateJWT, requireActiveSubscription } from '../middleware/authMiddleware';
 
 const router = Router();
+
+// Middleware to set CORP headers on ALL responses (including auth errors)
+// This MUST run before auth middleware so error responses also have proper headers
+const setAssetCORPHeaders = (_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+  next();
+};
 
 // CORS preflight handler for asset routes (video streaming requires this)
 const handleAssetPreflight = (_req: Request, res: Response) => {
@@ -40,8 +51,9 @@ router.get('/lessons/:lessonSlug/quiz', authenticateJWT, requireActiveSubscripti
 router.get('/lessons/:lessonSlug/assets', authenticateJWT, requireActiveSubscription, getLessonAssets);
 
 // Asset file routes with OPTIONS preflight support for CORS
+// setAssetCORPHeaders runs FIRST to ensure CORP headers on ALL responses (including 401/403 errors)
 router.options('/lessons/:lessonSlug/assets/:assetType', handleAssetPreflight);
-router.get('/lessons/:lessonSlug/assets/:assetType', authenticateJWT, requireActiveSubscription, getAssetFile);
+router.get('/lessons/:lessonSlug/assets/:assetType', setAssetCORPHeaders, authenticateJWT, requireActiveSubscription, getAssetFile);
 
 router.get('/lessons/:lessonSlug/transcript', authenticateJWT, requireActiveSubscription, getLessonTranscript);
 
