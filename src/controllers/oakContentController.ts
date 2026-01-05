@@ -161,25 +161,31 @@ export const getLessonAssets = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Stream/proxy a specific asset file (video, worksheet, etc.)
- * This proxies the request to Oak API with proper authentication
- * IMPORTANT: We set all CORS headers ourselves and DO NOT pass through Oak API headers
+ * Redirect to Oak API asset directly
+ * Instead of proxying (which causes timeout issues), we redirect to Oak API
+ * with a signed URL that includes our API key
  */
 export const getAssetFile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { lessonSlug, assetType } = req.params;
 
-    const { stream, contentType, contentDisposition, contentLength } = await oakApiService.getAssetFile(lessonSlug, assetType);
+    // Build the Oak API URL
+    const oakApiKey = process.env.OAK_API_KEY;
+    const oakBaseUrl = process.env.OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0';
+    const assetUrl = `${oakBaseUrl}/lessons/${lessonSlug}/assets/${assetType}`;
 
-    // CRITICAL: Set all CORS headers FIRST before any other headers
-    // These must be set to allow cross-origin video playback
-    // SECURITY FIX: Use requesting origin instead of wildcard
+    // CORS headers for the redirect response
     const requestOrigin = req.headers.origin || 'https://infoversedigitaleducation.net';
     res.setHeader('Access-Control-Allow-Origin', requestOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // For browsers that can't follow redirects with custom headers (video/download),
+    // we need to proxy. For others, we could redirect.
+    // Since video elements can't add Authorization headers, we MUST proxy.
+
+    const { stream, contentType, contentDisposition, contentLength } = await oakApiService.getAssetFile(lessonSlug, assetType);
 
     // Set content type
     res.setHeader('Content-Type', contentType);
@@ -189,20 +195,16 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
       res.setHeader('Content-Length', contentLength);
     }
 
-    // For video, enable streaming (no Content-Disposition) and range requests
+    // For video, enable streaming and range requests
     if (assetType === 'video') {
       res.setHeader('Accept-Ranges', 'bytes');
-      // Enable cross-origin embedding for video elements
       res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-      // Cache video for performance
       res.setHeader('Cache-Control', 'public, max-age=3600');
-      // Don't set Content-Disposition for videos - allow inline playback
     } else if (contentDisposition) {
-      // For downloadable assets like worksheets, set Content-Disposition
       res.setHeader('Content-Disposition', contentDisposition);
     }
 
-    // RELIABILITY FIX: Add error handlers before piping
+    // Add error handlers before piping
     stream.on('error', (err: Error) => {
       console.error('Stream error:', err);
       if (!res.headersSent) {

@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 // User Interface
 export interface IUser extends Document {
   email: string;
-  passwordHash: string;
+  passwordHash?: string; // Optional for OAuth users
   name: string;
   role: 'student' | 'instructor';
   subscription: {

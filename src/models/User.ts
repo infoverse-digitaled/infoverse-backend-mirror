@@ -7,7 +7,6 @@
  *       type: object
  *       required:
  *         - email
- *         - passwordHash
  *         - name
  *         - role
  *       properties:
@@ -68,7 +67,7 @@ const UserSchema = new Schema<IUser>(
     },
     passwordHash: {
       type: String,
-      required: [true, 'Password is required'],
+      required: false, // Optional for OAuth users (Google sign-in)
     },
     name: {
       type: String,

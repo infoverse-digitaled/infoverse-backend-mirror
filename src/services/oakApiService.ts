@@ -1,4 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
+import got from 'got';
 import config from '../config';
 import {
   KeyStage,
@@ -561,6 +565,7 @@ export class OakApiService {
 
   /**
    * Get a specific asset file (video, worksheet, etc.) - streams directly from Oak API
+   * Uses axios with extended timeouts for reliability
    * NOTE: We explicitly DO NOT pass through Oak API headers to avoid CORS conflicts
    * Note: Not all lessons have all asset types - throws custom error for 404
    */
@@ -568,65 +573,76 @@ export class OakApiService {
     this.checkRateLimit();
 
     try {
-      const response = await this.axiosInstance.get(
+      // Create a dedicated axios instance for streaming with longer timeouts
+      // and no maxBodyLength limit
+      const streamAxios = axios.create({
+        baseURL: config.oak.apiBaseUrl,
+        headers: {
+          ...(config.oak.apiKey && { Authorization: `Bearer ${config.oak.apiKey}` }),
+          'Accept': '*/*',
+          'User-Agent': 'Infoverse-Backend/1.0',
+        },
+        timeout: 120000, // 2 minutes
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        maxRedirects: 10,
+        httpsAgent: new https.Agent({
+          keepAlive: false, // Don't reuse sockets to avoid TLS issues
+          timeout: 120000,
+        }),
+      });
+
+      const response = await streamAxios.get(
         `/lessons/${lessonSlug}/assets/${assetType}`,
         {
           responseType: 'stream',
-          // Don't follow redirects automatically - we need to handle them
-          maxRedirects: 0,
-          validateStatus: (status) => status >= 200 && status < 400,
+          validateStatus: (status) => status < 500, // Allow 4xx to pass through
         }
       );
 
-      // If Oak API returns a redirect, follow it manually with our own request
-      if (response.status >= 300 && response.status < 400 && response.headers.location) {
-        const axios = require('axios');
-        const redirectResponse = await axios.get(response.headers.location, {
-          responseType: 'stream',
-          headers: {
-            // Don't send our Oak API key to external CDNs
-          }
-        });
-        return {
-          stream: redirectResponse.data,
-          contentType: redirectResponse.headers['content-type'] || 'video/mp4',
-          contentLength: redirectResponse.headers['content-length'],
-        };
+      // Handle 404
+      if (response.status === 404) {
+        response.data.destroy();
+        throw {
+          message: `Asset '${assetType}' not available for this lesson`,
+          statusCode: 404,
+        } as OakApiError;
       }
+
+      // Handle other client errors
+      if (response.status >= 400) {
+        response.data.destroy();
+        throw {
+          message: `Oak API error: ${response.status}`,
+          statusCode: response.status,
+        } as OakApiError;
+      }
+
+      // Success - return the stream
+      const contentType = assetType === 'video'
+        ? 'video/mp4'
+        : (response.headers['content-type'] || 'application/octet-stream');
 
       return {
         stream: response.data,
-        // For videos, default to video/mp4 for better browser compatibility
-        contentType: assetType === 'video'
-          ? 'video/mp4'
-          : (response.headers['content-type'] || 'application/octet-stream'),
+        contentType,
         contentDisposition: response.headers['content-disposition'],
         contentLength: response.headers['content-length'],
       };
     } catch (error: any) {
-      // Handle 404 - asset not available for this lesson
+      // Handle 404 specifically
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw {
           message: `Asset '${assetType}' not available for this lesson`,
           statusCode: 404,
         } as OakApiError;
       }
-      // Handle redirect errors (302, 307, etc.)
-      if (error.response && error.response.status >= 300 && error.response.status < 400) {
-        const redirectUrl = error.response.headers.location;
-        if (redirectUrl) {
-          const axios = require('axios');
-          const redirectResponse = await axios.get(redirectUrl, {
-            responseType: 'stream',
-          });
-          return {
-            stream: redirectResponse.data,
-            contentType: redirectResponse.headers['content-type'] || 'video/mp4',
-            contentLength: redirectResponse.headers['content-length'],
-          };
-        }
-      }
-      return this.handleApiError(error);
+
+      console.error(`[oakApiService] Asset stream error for ${assetType}:`, error.message);
+      throw {
+        message: error.message || 'Network error',
+        statusCode: error.response?.status || 500,
+      } as OakApiError;
     }
   }
 

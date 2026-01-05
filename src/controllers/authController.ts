@@ -26,7 +26,7 @@ interface AuthenticatedRequest extends Request {
 
 /**
  * Handles user registration.
- * It hashes the password, checks for existing users, and creates a new user document.
+ * If user already exists, verifies password and logs them in (unified auth flow).
  * Supports B2B school licensing via optional licenseKey parameter.
  */
 export const register = async (req: Request, res: Response, next: NextFunction) => {
@@ -36,8 +36,31 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     // Check if a user with the same email already exists.
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      // Use a custom HttpError to handle the response uniformly.
-      throw new HttpError(409, 'EMAIL_EXISTS', 'Email already in use.');
+      // User exists - check if OAuth user (no password)
+      if (!existingUser.passwordHash) {
+        throw new HttpError(401, 'OAUTH_USER', 'This account uses Google sign-in. Please continue with Google.');
+      }
+
+      // Verify password and log them in (unified auth)
+      const isMatch = await bcrypt.compare(password, existingUser.passwordHash);
+      if (!isMatch) {
+        throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
+      }
+
+      // Generate token for existing user
+      const secret = new TextEncoder().encode(config.jwt.secret);
+      const token = await new SignJWT({ userId: String(existingUser._id), role: existingUser.role })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime(config.jwt.expiresIn)
+        .sign(secret);
+
+      console.log(`[Auth] Existing user logged in via signup: ${email}`);
+
+      return successResponse(res, {
+        ...existingUser.toObject(),
+        token,
+        skipPayment: !!existingUser.subscription && existingUser.subscription.status !== 'free',
+      }, 'Login successful', 200);
     }
 
     // Hash the user's password with a salt round of 10 for security.
@@ -118,24 +141,46 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
 /**
  * Handles user login and generates a secure JWT.
- * It compares the provided password with the stored hash and sets the JWT in a secure cookie.
+ * If user doesn't exist, auto-creates account with the provided credentials.
+ * This provides a unified auth experience.
  */
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, name } = req.body;
 
     // Find the user by their email.
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
+
     if (!user) {
-      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
+      // User doesn't exist - auto-create account
+      const passwordHash = await bcrypt.hash(password, 10);
+      const defaultName = name || email.split('@')[0]; // Use provided name or email prefix
+
+      user = await User.create({
+        name: defaultName,
+        email,
+        passwordHash,
+        subscription: {
+          status: 'trialing',
+          plan: 'premium',
+          trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
+        },
+      });
+
+      console.log(`[Auth] Auto-created account for: ${email}`);
+    } else {
+      // User exists - verify password
+      // Check if user signed up with OAuth (no password)
+      if (!user.passwordHash) {
+        throw new HttpError(401, 'OAUTH_USER', 'This account uses Google sign-in. Please continue with Google.');
+      }
+
+      const isMatch = await bcrypt.compare(password, user.passwordHash);
+      if (!isMatch) {
+        throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
+      }
     }
 
-    // Compare the provided password with the stored password hash.
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
-    }
-    
     // Create a JSON Web Token with the user's ID and role, expiring in 7 days.
     const secret = new TextEncoder().encode(config.jwt.secret);
     const token = await new SignJWT({ userId: String(user._id), role: user.role })
@@ -144,12 +189,10 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       .sign(secret);
 
     // Set the JWT as a secure, HTTP-only cookie.
-    // The `httpOnly` flag prevents client-side scripts from accessing the cookie,
-    // and the `secure` flag ensures the cookie is only sent over HTTPS in production.
     res.cookie('token', token, {
       httpOnly: true,
       secure: config.env === 'production',
-      sameSite: 'strict', // Protects against CSRF attacks.
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds.
     });
 
@@ -159,7 +202,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     };
     successResponse(res, data, 'Login successful');
   } catch (err) {
-    // Forward the error to the global error handler middleware.
     next(err);
   }
 };
@@ -406,6 +448,11 @@ export const changePassword = async (req: Request, res: Response, next: NextFunc
     const userDoc = await User.findById(user.id);
     if (!userDoc) {
       throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
+    }
+
+    // Check if OAuth user (no password to change)
+    if (!userDoc.passwordHash) {
+      throw new HttpError(400, 'OAUTH_USER', 'Cannot change password for Google sign-in accounts.');
     }
 
     // Verify current password
