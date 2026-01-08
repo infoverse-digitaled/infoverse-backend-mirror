@@ -302,18 +302,50 @@ export class OakApiService {
         // Log available sequences for debugging
         console.log(`[OakAPI] Subject ${subjectSlug} has ${subjectData.sequenceSlugs?.length || 0} sequences`);
 
-        // Step 2: Find the sequence that matches the requested key stage
-        const matchingSequence = subjectData.sequenceSlugs?.find((seq: any) =>
+        // Step 2: Find the BEST sequence for the requested key stage
+        // Oak API can have overlapping sequences (e.g., english-primary covers KS1-3, english-secondary covers KS3-4)
+        // We need to pick the most appropriate one, not just the first match
+        const candidateSequences = subjectData.sequenceSlugs?.filter((seq: any) =>
           seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage)
-        );
+        ) || [];
 
-        if (!matchingSequence) {
-          // Return empty array if no matching sequence found
+        if (candidateSequences.length === 0) {
           console.warn(`[OakAPI] No matching sequence found for keyStage=${keyStage} in subject=${subjectSlug}`);
           return [];
         }
 
-        console.log(`[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug}`);
+        // Select the best sequence based on keystage level
+        // KS1, KS2 should prefer "primary" sequences
+        // KS3, KS4 should prefer "secondary" sequences
+        const isSecondaryLevel = keyStage === 'ks3' || keyStage === 'ks4';
+        const isPrimaryLevel = keyStage === 'ks1' || keyStage === 'ks2';
+
+        let matchingSequence = candidateSequences[0]; // Default to first match
+
+        if (candidateSequences.length > 1) {
+          // Multiple sequences match - pick the best one
+          const bestMatch = candidateSequences.find((seq: any) => {
+            const seqSlug = (seq.sequenceSlug || '').toLowerCase();
+            if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
+            if (isPrimaryLevel && seqSlug.includes('primary')) return true;
+            return false;
+          });
+
+          if (bestMatch) {
+            matchingSequence = bestMatch;
+          } else {
+            // Fallback: prefer sequence where keystage is NOT at the boundary
+            // (i.e., sequence with fewer keystages, or where our keystage is more central)
+            const sorted = candidateSequences.sort((a: any, b: any) => {
+              const aKeyStages = a.keyStages?.length || 0;
+              const bKeyStages = b.keyStages?.length || 0;
+              return aKeyStages - bKeyStages; // Prefer more specific (fewer keystages)
+            });
+            matchingSequence = sorted[0];
+          }
+        }
+
+        console.log(`[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug} (from ${candidateSequences.length} candidates)`);
 
         // Step 3: Fetch units for this sequence
         const unitsResponse = await this.axiosInstance.get<any>(
