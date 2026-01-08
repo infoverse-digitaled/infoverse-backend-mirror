@@ -359,9 +359,32 @@ export class OakApiService {
           return [];
         }
 
+        // Define year ranges for each key stage (UK National Curriculum)
+        const keyStageYearRanges: Record<string, { min: number; max: number }> = {
+          'ks1': { min: 1, max: 2 },   // Years 1-2 (ages 5-7)
+          'ks2': { min: 3, max: 6 },   // Years 3-6 (ages 7-11)
+          'ks3': { min: 7, max: 9 },   // Years 7-9 (ages 11-14)
+          'ks4': { min: 10, max: 11 }, // Years 10-11 (ages 14-16)
+        };
+
+        const yearRange = keyStageYearRanges[keyStage];
+        if (!yearRange) {
+          console.warn(`[OakAPI] Unknown keyStage: ${keyStage}, returning all units`);
+        }
+
         // Step 4: Flatten and normalize the units array (units are grouped by year)
+        // Filter to only include units from years that belong to this keystage
         const allUnits: any[] = [];
         yearlyUnits.forEach((yearGroup: any) => {
+          // Filter by year range if we have a valid keystage
+          const yearNum = parseInt(yearGroup.year, 10);
+          if (yearRange && !isNaN(yearNum)) {
+            if (yearNum < yearRange.min || yearNum > yearRange.max) {
+              // Skip this year group - it doesn't belong to this keystage
+              return;
+            }
+          }
+
           if (yearGroup.units && Array.isArray(yearGroup.units)) {
             yearGroup.units.forEach((unit: any) => {
               // Some units have unitSlug directly, others have unitOptions array
