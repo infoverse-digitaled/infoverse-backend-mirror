@@ -370,7 +370,12 @@ export class OakApiService {
         const yearRange = keyStageYearRanges[keyStage];
         if (!yearRange) {
           console.warn(`[OakAPI] Unknown keyStage: ${keyStage}, returning all units`);
+        } else {
+          console.log(`[OakAPI] Year range for ${keyStage}: ${yearRange.min}-${yearRange.max}`);
         }
+
+        // Log all year groups available
+        console.log(`[OakAPI] Available year groups: ${yearlyUnits.map((yg: any) => yg.year).join(', ')}`);
 
         // Step 4: Flatten and normalize the units array (units are grouped by year)
         // Filter to only include units from years that belong to this keystage
@@ -381,8 +386,10 @@ export class OakApiService {
           if (yearRange && !isNaN(yearNum)) {
             if (yearNum < yearRange.min || yearNum > yearRange.max) {
               // Skip this year group - it doesn't belong to this keystage
+              console.log(`[OakAPI] Skipping year ${yearNum} (outside range ${yearRange.min}-${yearRange.max})`);
               return;
             }
+            console.log(`[OakAPI] Including year ${yearNum} (within range ${yearRange.min}-${yearRange.max})`);
           }
 
           if (yearGroup.units && Array.isArray(yearGroup.units)) {
@@ -788,9 +795,16 @@ export class OakApiService {
       if (keys.length === 0) {
         return 0;
       }
-      const deleted = await this.redis.del(...keys);
-      console.log(`[OakAPI Cache] Deleted ${deleted} keys`);
-      return deleted;
+      // Delete keys in batches to avoid Redis limits
+      let totalDeleted = 0;
+      const batchSize = 100;
+      for (let i = 0; i < keys.length; i += batchSize) {
+        const batch = keys.slice(i, i + batchSize);
+        const deleted = await this.redis.del(...batch);
+        totalDeleted += deleted;
+      }
+      console.log(`[OakAPI Cache] Deleted ${totalDeleted} keys`);
+      return totalDeleted;
     } catch (error) {
       console.error('[OakAPI Cache] Clear error:', error);
       throw error;
