@@ -11,8 +11,23 @@ import {
   getAssetFile,
   getLessonTranscript,
   searchLessons,
+  clearSubjectCache,
+  clearKeyStageCache,
+  clearAllCache,
 } from '../controllers/oakContentController';
-import { optionalAuth, authenticateJWT, requireActiveSubscription } from '../middleware/authMiddleware';
+import { optionalAuth, authenticateJWT, requireActiveSubscription, AuthenticatedRequest } from '../middleware/authMiddleware';
+
+// Admin check middleware
+const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const user = (req as AuthenticatedRequest).user;
+  if (!user || user.role !== 'admin') {
+    res.status(403).json({
+      error: { code: 'FORBIDDEN', message: 'Admin access required' },
+    });
+    return;
+  }
+  next();
+};
 
 const router = Router();
 
@@ -56,5 +71,10 @@ router.options('/lessons/:lessonSlug/assets/:assetType', handleAssetPreflight);
 router.get('/lessons/:lessonSlug/assets/:assetType', setAssetCORPHeaders, authenticateJWT, requireActiveSubscription, getAssetFile);
 
 router.get('/lessons/:lessonSlug/transcript', authenticateJWT, requireActiveSubscription, getLessonTranscript);
+
+// Admin routes for cache management
+router.delete('/cache/:keyStage/:subjectSlug', authenticateJWT, requireAdmin, clearSubjectCache);
+router.delete('/cache/:keyStage', authenticateJWT, requireAdmin, clearKeyStageCache);
+router.delete('/cache', authenticateJWT, requireAdmin, clearAllCache);
 
 export default router;

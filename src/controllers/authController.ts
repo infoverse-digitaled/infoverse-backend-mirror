@@ -74,7 +74,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     } = {
       status: 'trialing',
       plan: 'premium',
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      trialEndsAt: new Date(Date.now() + config.payment.trialDays * 24 * 60 * 60 * 1000), // Configurable trial period
     };
 
     let userLicenseKey: string | undefined;
@@ -163,7 +163,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         subscription: {
           status: 'trialing',
           plan: 'premium',
-          trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
+          trialEndsAt: new Date(Date.now() + config.payment.trialDays * 24 * 60 * 60 * 1000), // Configurable trial period
         },
       });
 

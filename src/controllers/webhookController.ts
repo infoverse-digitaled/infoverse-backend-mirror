@@ -30,33 +30,51 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
     switch (event.event) {
       case 'charge.success':
-        // Update to active and extend expiry
-        // Usually we get 'authorization' and 'plan' in data
-        // For simplicity, we just set to active and update expiry if provided or just set to active
-        // If it's a subscription payment, we might want to check existing subscription
+        // Successful payment - activate subscription
+        console.log(`[Webhook] charge.success for ${email}`);
         await User.findByIdAndUpdate(user._id, {
           'subscription.status': 'active',
           'subscription.plan': 'premium',
-          // Optionally set expiresAt based on plan interval if we parsed it,
-          // but Paystack handles the recurring billing.
-          // We can set it to a future date just in case.
+          'subscription.trialEndsAt': null, // Clear trial if was trialing
+        });
+        break;
+
+      case 'subscription.create':
+        // Subscription created successfully
+        console.log(`[Webhook] subscription.create for ${email}`);
+        await User.findByIdAndUpdate(user._id, {
+          'subscription.status': 'active',
+          'subscription.plan': 'premium',
         });
         break;
 
       case 'subscription.disable':
+      case 'subscription.not_renew':
+        // Subscription cancelled or won't renew
+        console.log(`[Webhook] ${event.event} for ${email}`);
         await User.findByIdAndUpdate(user._id, {
           'subscription.status': 'cancelled',
         });
         break;
 
       case 'invoice.payment_failed':
+      case 'charge.failed':
+        // Payment failed - set to past_due so user is blocked
+        console.log(`[Webhook] ${event.event} for ${email}`);
         await User.findByIdAndUpdate(user._id, {
           'subscription.status': 'past_due',
         });
         break;
 
+      case 'invoice.update':
+      case 'invoice.create':
+        // Informational - just log
+        console.log(`[Webhook] ${event.event} for ${email}`);
+        break;
+
       default:
-        // Handle other events or ignore
+        // Log unknown events for debugging
+        console.log(`[Webhook] Unhandled event: ${event.event} for ${email}`);
         break;
     }
 

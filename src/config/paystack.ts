@@ -1,14 +1,56 @@
+import config from './index';
+
+// Plan codes for different environments
+const PLAN_CODES = {
+  test: {
+    INDIVIDUAL_MONTHLY: 'PLN_ycwo3qwzubzlv3v',
+    INDIVIDUAL_ANNUAL: 'PLN_o1rf7r0jl507aoq',
+    FAMILY_ANNUAL: '', // Add test family plan code if needed
+  },
+  live: {
+    INDIVIDUAL_MONTHLY: 'PLN_vnfkw3ejctr7fe4',
+    INDIVIDUAL_ANNUAL: 'PLN_t56h44wx8f2vcw7',
+    FAMILY_ANNUAL: 'PLN_8et2pw5d7mfg3j1',
+  },
+};
+
+// Get the correct plan codes based on current mode
+const currentMode = config.paystack.mode;
+const activePlanCodes = PLAN_CODES[currentMode];
+
 export const PAYSTACK_PLANS = {
   INDIVIDUAL_MONTHLY: {
-    code: 'PLN_vnfkw3ejctr7fe4',
-    amount: 750000, // ₦7,500
+    code: activePlanCodes.INDIVIDUAL_MONTHLY,
+    amount: 500000, // ₦5,000
   },
   INDIVIDUAL_ANNUAL: {
-    code: 'PLN_t56h44wx8f2vcw7',
-    amount: 6500000, // ₦65,000
+    code: activePlanCodes.INDIVIDUAL_ANNUAL,
+    amount: 4000000, // ₦40,000
   },
   FAMILY_ANNUAL: {
-    code: 'PLN_8et2pw5d7mfg3j1',
+    code: activePlanCodes.FAMILY_ANNUAL,
     amount: 11500000, // ₦115,000
   },
 };
+
+// Export plan codes for API endpoint
+export const getActivePlanCodes = () => ({
+  mode: currentMode,
+  plans: [
+    {
+      id: 'annual',
+      name: 'Annual Plan',
+      price: '₦40,000',
+      description: 'Best value - save 33%',
+      planCode: activePlanCodes.INDIVIDUAL_ANNUAL,
+      recommended: true,
+    },
+    {
+      id: 'monthly',
+      name: 'Monthly Plan',
+      price: '₦5,000',
+      description: 'Billed monthly',
+      planCode: activePlanCodes.INDIVIDUAL_MONTHLY,
+    },
+  ],
+});

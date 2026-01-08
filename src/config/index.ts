@@ -30,7 +30,15 @@ interface AppConfig {
     rateLimit: number;
   };
   paystack: {
+    mode: 'test' | 'live';
     secretKey: string;
+    publicKey: string;
+  };
+  payment: {
+    enabled: boolean;
+    enableFreeTrial: boolean;
+    enableDirectPayment: boolean;
+    trialDays: number;
   };
 }
 
@@ -53,6 +61,18 @@ const validateConfig = (): AppConfig => {
     OAK_API_KEY,
     OAK_API_RATE_LIMIT,
     PAYSTACK_SECRET_KEY,
+    PAYSTACK_PUBLIC_KEY,
+    // Paystack mode switching (test/live)
+    PAYSTACK_MODE,
+    PAYSTACK_SECRET_KEY_TEST,
+    PAYSTACK_SECRET_KEY_LIVE,
+    PAYSTACK_PUBLIC_KEY_TEST,
+    PAYSTACK_PUBLIC_KEY_LIVE,
+    // Payment feature flags
+    PAYMENT_ENABLED,
+    ENABLE_FREE_TRIAL,
+    ENABLE_DIRECT_PAYMENT,
+    TRIAL_DAYS,
   } = process.env;
 
   // --- Validation for required variables ---
@@ -64,12 +84,25 @@ const validateConfig = (): AppConfig => {
     throw new Error('Missing required environment variable: JWT_SECRET');
   }
 
-  // NOTE: In a real production scenario, we should enforce PAYSTACK_SECRET_KEY presence.
-  // For development or if payment is optional, we might make it optional or provide a default/mock.
-  // Here we'll treat it as optional for now to avoid breaking existing setups without the key,
-  // but strictly strictly speaking for the feature request, it's needed.
-  // Let's default to an empty string if missing, but log a warning if needed (logging not shown here).
-  const paystackSecretKey = PAYSTACK_SECRET_KEY || '';
+  // Paystack mode-based key selection
+  // Priority: 1) Mode-specific keys (TEST/LIVE), 2) Single key fallback
+  const paystackMode = (PAYSTACK_MODE === 'test' ? 'test' : 'live') as 'test' | 'live';
+
+  let paystackSecretKey: string;
+  let paystackPublicKey: string;
+
+  if (paystackMode === 'test') {
+    // Test mode: prefer TEST keys, fallback to single key
+    paystackSecretKey = PAYSTACK_SECRET_KEY_TEST || PAYSTACK_SECRET_KEY || '';
+    paystackPublicKey = PAYSTACK_PUBLIC_KEY_TEST || PAYSTACK_PUBLIC_KEY || '';
+  } else {
+    // Live mode: prefer LIVE keys, fallback to single key
+    paystackSecretKey = PAYSTACK_SECRET_KEY_LIVE || PAYSTACK_SECRET_KEY || '';
+    paystackPublicKey = PAYSTACK_PUBLIC_KEY_LIVE || PAYSTACK_PUBLIC_KEY || '';
+  }
+
+  // Log which mode is active (helpful for debugging)
+  console.log(`[Config] Paystack mode: ${paystackMode.toUpperCase()}`);
 
   const redisPort = REDIS_PORT ? parseInt(REDIS_PORT, 10) : 6379;
   if (Number.isNaN(redisPort)) {
@@ -116,10 +149,19 @@ const validateConfig = (): AppConfig => {
     oak: {
       apiBaseUrl: OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0',
       apiKey: OAK_API_KEY || '',
-      rateLimit: OAK_API_RATE_LIMIT ? parseInt(OAK_API_RATE_LIMIT, 10) : 100,
+      rateLimit: OAK_API_RATE_LIMIT ? parseInt(OAK_API_RATE_LIMIT, 10) : 1000,
     },
     paystack: {
+      mode: paystackMode,
       secretKey: paystackSecretKey,
+      publicKey: paystackPublicKey,
+    },
+    payment: {
+      // Default to true if not specified (backwards compatible)
+      enabled: PAYMENT_ENABLED !== 'false',
+      enableFreeTrial: ENABLE_FREE_TRIAL !== 'false',
+      enableDirectPayment: ENABLE_DIRECT_PAYMENT !== 'false',
+      trialDays: TRIAL_DAYS ? parseInt(TRIAL_DAYS, 10) : 7,
     },
   };
 };

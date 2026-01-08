@@ -237,6 +237,77 @@ export const getLessonTranscript = async (req: Request, res: Response, next: Nex
 };
 
 /**
+ * Clear cache for a specific key stage and subject (Admin only)
+ * Used to fix issues with stale/corrupted cache data
+ */
+export const clearSubjectCache = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { keyStage, subjectSlug } = req.params;
+
+    if (!keyStage || !subjectSlug) {
+      return res.status(400).json({
+        error: { code: 'BAD_REQUEST', message: 'keyStage and subjectSlug are required' },
+      });
+    }
+
+    const deletedCount = await oakApiService.clearSubjectCache(keyStage, subjectSlug);
+
+    successResponse(
+      res,
+      { deletedCount, keyStage, subjectSlug },
+      `Cache cleared for ${keyStage}/${subjectSlug}. ${deletedCount} keys deleted.`,
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Clear all cache for a key stage (Admin only)
+ */
+export const clearKeyStageCache = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { keyStage } = req.params;
+
+    if (!keyStage) {
+      return res.status(400).json({
+        error: { code: 'BAD_REQUEST', message: 'keyStage is required' },
+      });
+    }
+
+    const deletedCount = await oakApiService.clearKeyStageCache(keyStage);
+
+    successResponse(
+      res,
+      { deletedCount, keyStage },
+      `Cache cleared for ${keyStage}. ${deletedCount} keys deleted.`,
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Clear all Oak API cache (Admin only)
+ */
+export const clearAllCache = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const deletedCount = await oakApiService.clearCache('');
+
+    successResponse(
+      res,
+      { deletedCount },
+      `All Oak API cache cleared. ${deletedCount} keys deleted.`,
+      200
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Search lessons
  * Filters out paid subject content for free users
  */

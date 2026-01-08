@@ -126,19 +126,22 @@ export class OakApiService {
         if (cached) {
           // RELIABILITY FIX: Wrap JSON.parse in try-catch to handle corrupted cache
           try {
+            console.log(`[OakAPI Cache] HIT for key: ${cacheKey}`);
             return JSON.parse(cached) as T;
           } catch (parseError) {
-            console.error(`Cache parse error for key ${cacheKey}, clearing corrupted cache:`, parseError);
+            console.error(`[OakAPI Cache] Parse error for key ${cacheKey}, clearing corrupted cache:`, parseError);
             // Delete corrupted cache entry and fall through to fetch fresh data
             try {
               await this.redis.del(cacheKey);
             } catch (delError) {
-              console.error(`Failed to delete corrupted cache key ${cacheKey}:`, delError);
+              console.error(`[OakAPI Cache] Failed to delete corrupted cache key ${cacheKey}:`, delError);
             }
           }
+        } else {
+          console.log(`[OakAPI Cache] MISS for key: ${cacheKey}`);
         }
       } catch (error) {
-        console.error(`Cache get error for key ${cacheKey}:`, error);
+        console.error(`[OakAPI Cache] Get error for key ${cacheKey}:`, error);
         // Continue to fetch from API if cache fails
       }
     }
@@ -192,8 +195,15 @@ export class OakApiService {
 
   /**
    * Check rate limit before making requests
+   * Automatically resets if the reset time has passed
    */
   private checkRateLimit(): void {
+    // If we have a reset time and it has passed, reset the counter
+    if (this.rateLimitReset && new Date() >= this.rateLimitReset) {
+      this.rateLimitRemaining = config.oak.rateLimit;
+      this.rateLimitReset = null;
+    }
+
     if (this.rateLimitRemaining <= 0) {
       const resetTime = this.rateLimitReset?.toISOString() || 'unknown';
       throw {
@@ -277,15 +287,20 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
+        console.log(`[OakAPI] Fetching units for keyStage=${keyStage}, subject=${subjectSlug}`);
+
         // Step 1: Get the subject to find the appropriate sequence
         const subjectResponse = await this.axiosInstance.get<any>(`/subjects/${subjectSlug}`);
         const subjectData = this.unwrap<any>(subjectResponse.data);
 
         // RELIABILITY FIX: Validate subjectData exists
         if (!subjectData) {
-          console.warn(`No subject data returned for ${subjectSlug}`);
+          console.warn(`[OakAPI] No subject data returned for ${subjectSlug}`);
           return [];
         }
+
+        // Log available sequences for debugging
+        console.log(`[OakAPI] Subject ${subjectSlug} has ${subjectData.sequenceSlugs?.length || 0} sequences`);
 
         // Step 2: Find the sequence that matches the requested key stage
         const matchingSequence = subjectData.sequenceSlugs?.find((seq: any) =>
@@ -294,8 +309,11 @@ export class OakApiService {
 
         if (!matchingSequence) {
           // Return empty array if no matching sequence found
+          console.warn(`[OakAPI] No matching sequence found for keyStage=${keyStage} in subject=${subjectSlug}`);
           return [];
         }
+
+        console.log(`[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug}`);
 
         // Step 3: Fetch units for this sequence
         const unitsResponse = await this.axiosInstance.get<any>(
@@ -711,14 +729,33 @@ export class OakApiService {
   async clearCache(pattern: string): Promise<number> {
     try {
       const keys = await this.redis.keys(`oak:${pattern}*`);
+      console.log(`[OakAPI Cache] Clearing ${keys.length} keys matching pattern: oak:${pattern}*`);
       if (keys.length === 0) {
         return 0;
       }
-      return await this.redis.del(...keys);
+      const deleted = await this.redis.del(...keys);
+      console.log(`[OakAPI Cache] Deleted ${deleted} keys`);
+      return deleted;
     } catch (error) {
-      console.error('Cache clear error:', error);
+      console.error('[OakAPI Cache] Clear error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Clear cache for a specific key stage and subject
+   */
+  async clearSubjectCache(keyStage: string, subjectSlug: string): Promise<number> {
+    const pattern = `keystage:${keyStage}:subject:${subjectSlug}`;
+    return this.clearCache(pattern);
+  }
+
+  /**
+   * Clear all cache for a key stage
+   */
+  async clearKeyStageCache(keyStage: string): Promise<number> {
+    const pattern = `keystage:${keyStage}`;
+    return this.clearCache(pattern);
   }
 
   /**
@@ -763,5 +800,7 @@ export default {
   getLessonTranscript: (lessonSlug: string) => getOakApiService().getLessonTranscript(lessonSlug),
   searchLessons: (query: string, filters?: SearchFilters) => getOakApiService().searchLessons(query, filters),
   clearCache: (pattern: string) => getOakApiService().clearCache(pattern),
+  clearSubjectCache: (keyStage: string, subjectSlug: string) => getOakApiService().clearSubjectCache(keyStage, subjectSlug),
+  clearKeyStageCache: (keyStage: string) => getOakApiService().clearKeyStageCache(keyStage),
   getRateLimitStatus: () => getOakApiService().getRateLimitStatus(),
 };

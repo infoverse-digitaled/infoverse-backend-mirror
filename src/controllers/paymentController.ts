@@ -1,18 +1,29 @@
 import { Request, Response } from 'express';
 import * as paystackService from '../services/paystackService';
 import User from '../models/User';
-import { PAYSTACK_PLANS } from '../config/paystack';
+import { PAYSTACK_PLANS, getActivePlanCodes } from '../config/paystack';
 import { successResponse } from '../middleware/response';
+import config from '../config';
 
 // Type guard or helper to find plan key from code could be useful,
 // but for now we map all paid plans to 'premium' in the User model.
 
 /**
- * Start a 14-day cardless free trial
+ * Start a free trial (configurable days, default 7)
  * No credit card required - user gets immediate access
  */
 export const startTrial = async (req: Request, res: Response) => {
   try {
+    // Check if payments are enabled
+    if (!config.payment.enabled) {
+      return res.status(503).json({ error: 'Payment system is currently disabled' });
+    }
+
+    // Check if free trial is enabled
+    if (!config.payment.enableFreeTrial) {
+      return res.status(403).json({ error: 'Free trial is currently disabled. Please proceed to payment.' });
+    }
+
     const { planCode } = req.body;
     const user = (req as any).user;
 
@@ -44,9 +55,10 @@ export const startTrial = async (req: Request, res: Response) => {
       }
     }
 
-    // Calculate trial end date (14 days from now)
+    // Calculate trial end date (configurable, default 7 days)
+    const trialDays = config.payment.trialDays;
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+    trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     // Update user with trial subscription
     await User.findByIdAndUpdate(user.id, {
@@ -56,7 +68,7 @@ export const startTrial = async (req: Request, res: Response) => {
     });
 
     res.status(200).json({
-      message: 'Your 14-day free trial has started!',
+      message: `Your ${trialDays}-day free trial has started!`,
       trialEndsAt: trialEndsAt.toISOString(),
       redirectUrl: '/dashboard',
     });
@@ -175,6 +187,16 @@ export const verifyPayment = async (req: Request, res: Response) => {
  */
 export const initializePayment = async (req: Request, res: Response) => {
   try {
+    // Check if payments are enabled
+    if (!config.payment.enabled) {
+      return res.status(503).json({ error: 'Payment system is currently disabled' });
+    }
+
+    // Check if direct payment is enabled
+    if (!config.payment.enableDirectPayment) {
+      return res.status(403).json({ error: 'Direct payment is currently disabled. Please start with a free trial.' });
+    }
+
     const { planCode } = req.body;
     const user = (req as any).user;
 
@@ -222,6 +244,12 @@ export const initializePayment = async (req: Request, res: Response) => {
  */
 export const getPricing = async (_req: Request, res: Response) => {
   try {
+    // Calculate annual savings: (monthly * 12) - annual
+    const monthlyCost = PAYSTACK_PLANS.INDIVIDUAL_MONTHLY.amount;
+    const annualCost = PAYSTACK_PLANS.INDIVIDUAL_ANNUAL.amount;
+    const annualSavings = (monthlyCost * 12) - annualCost;
+    const savingsFormatted = `₦${(annualSavings / 100).toLocaleString()} per year`;
+
     const plans = [
       {
         id: 'individual_monthly',
@@ -244,7 +272,7 @@ export const getPricing = async (_req: Request, res: Response) => {
         amount: PAYSTACK_PLANS.INDIVIDUAL_ANNUAL.amount,
         currency: 'NGN',
         interval: 'annual',
-        savings: '₦25,000 per year',
+        savings: savingsFormatted,
         features: [
           'Access to all premium subjects',
           'Unlimited lesson access',
@@ -272,9 +300,36 @@ export const getPricing = async (_req: Request, res: Response) => {
       },
     ];
 
-    successResponse(res, plans, 'Pricing plans retrieved successfully', 200);
+    // Include payment configuration status for frontend
+    const response = {
+      plans,
+      config: {
+        paymentEnabled: config.payment.enabled,
+        freeTrialEnabled: config.payment.enableFreeTrial,
+        directPaymentEnabled: config.payment.enableDirectPayment,
+        trialDays: config.payment.trialDays,
+        paystackMode: config.paystack.mode,
+        paystackPublicKey: config.paystack.publicKey,
+      },
+    };
+
+    successResponse(res, response, 'Pricing plans retrieved successfully', 200);
   } catch (error: any) {
     console.error('Get Pricing Error:', error);
     res.status(500).json({ error: error.message || 'Failed to retrieve pricing' });
+  }
+};
+
+/**
+ * Get active plan codes for modals
+ * Public endpoint - returns plan codes based on current Paystack mode (test/live)
+ */
+export const getPlans = async (_req: Request, res: Response) => {
+  try {
+    const planData = getActivePlanCodes();
+    res.status(200).json(planData);
+  } catch (error: any) {
+    console.error('Get Plans Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to retrieve plans' });
   }
 };
