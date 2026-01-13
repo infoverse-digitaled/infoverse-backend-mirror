@@ -1,45 +1,70 @@
-- Use Nia deep research agent to help out with the following: 
-# Error Type
-Console AxiosError
+# Infoverse Backend - Claude Instructions
 
-## Error Message
-Request failed with status code 400
+## Current Priorities
+<!-- Update this section each session -->
+- No pending tasks
 
+## Known Issues / Context
+- **KS4 Tiered Structure**: KS4 Maths and Science use Foundation/Higher tiers in Oak API. Fixed in Jan 2026 to parse `tiers` and `examSubjects` structures.
+- **Keystage scrambling**: Was caused by wrong sequence selection + missing year filtering. Fixed in commit 7ce9997.
 
-    at async handleStartTrial (src/app/pricing/page.tsx:58:24)
+## Architecture Decisions
+- Oak API caching: 12-24 hours TTL in Redis
+- Frontend SWR: 30s deduping, no revalidate on focus
+- Payment: Paystack with test/live mode switching
 
-## Code Frame
-  56 |     try {
-  57 |       setLoadingPlan(planCode);
-> 58 |       const response = await authApiClient.post<{ authorization_url: string }>(
-     |                        ^
-  59 |         '/payment/start-trial',
-  60 |         { planCode }
-  61 |       );
+## API Endpoints Reference
+- Units: `GET /api/v1/oak/subjects/:keyStage/:subjectSlug/units`
+- Lessons: `GET /api/v1/oak/units/:unitSlug/lessons`
+- Lesson details (premium): `GET /api/v1/oak/lessons/:lessonSlug`
 
-Next.js version: 16.0.3 (Turbopack)
+## Pre-Deployment Checklist (Oak API Changes)
 
+**Before deploying ANY changes to Oak API integration:**
 
-## Error Type
-Console Error
+1. [ ] Run integration tests: `npm run test:integration`
+2. [ ] Manually verify KS1 ≠ KS2 data:
+   ```bash
+   curl localhost:5001/api/v1/oak/subjects/ks1/maths/units | jq '.[0:2]'
+   curl localhost:5001/api/v1/oak/subjects/ks2/maths/units | jq '.[0:2]'
+   # Should return DIFFERENT data
+   ```
+3. [ ] Verify year ranges are correct:
+   - KS1 units should have year 1-2 only
+   - KS2 units should have year 3-6 only
+   - KS3 units should have year 7-9 only
+   - KS4 units should have year 10-11 only
+4. [ ] Clear Redis cache after deployment
+5. [ ] Test production endpoints after deployment
 
-## Error Message
-API Error: 400 {}
+**Why this exists:** On Dec 4 2025, a bug was deployed where KS1/KS2 returned identical data. This checklist would have caught it.
 
+## Session Handoff Notes
+<!-- Claude should update this before session ends -->
+Last updated: 2026-01-13
+Status: Session complete - Science subject added, KS4 tier selection implemented
 
-    at <unknown> (src/lib/api/auth-client.ts:51:15)
-    at async handleStartTrial (src/app/pricing/page.tsx:58:24)
+### Completed This Session:
+- Added Science subject for all key stages (KS1-KS4)
+- Implemented KS4 Maths tier selection UI (Foundation/Higher cards)
+- Implemented KS4 Science exam subject + tier selection UI
+  - Exam subjects: Combined Science, Biology, Chemistry, Physics
+  - Each with Foundation/Higher tiers
+- Fixed Back button navigation to preserve key stage selection
+- Browse page now uses URL params (?ks=4) to persist key stage tab
+- Removed grade descriptions from tier selection cards
+- Verified trial counter, inactivity-based countdown, and Paystack live mode
 
-## Code Frame
-  49 |         }
-  50 |       }
-> 51 |       console.error('API Error:', error.response.status, error.response.data);
-     |               ^
-  52 |     } else if (error.request) {
-  53 |       // Request made but no response
-  54 |       console.error('Network Error:', error.message);
+### Verified Systems:
+- Trial day counter: Working correctly (7 days from account creation)
+- Trial based on account creation, NOT user activity: Confirmed
+- Paystack mode: LIVE (with live plan codes)
 
-Next.js version: 16.0.3 (Turbopack)
-right so um a couple things help me create a dashboard um in the help me create a progress tracker in the dashboard that dashboard page a progress tracker and also help me create a profile page right because there's already a button in the sidebar of a dashboard called um profile but like when you click on it it just gives you a 404 error page not found so create a um like a profile page maybe edit username stuff like edit username change password stuff like that and also uh on the pricing page the button like to start the free trial button when you click on it it doesn't work it doesn't do anything it doesn't work at all so obviously it should more or less take you to the um sign up thing like okay starting your sign up and all of that and it should the button should no longer say start seven day free trial rather it should say start 14 day free trial um and yeah all the like copy and everything should revolve should say 14 days not um seven day and always put no credit card required that's also very important you
+### Commits Made:
+- Backend: `c0a35fd` - feat: Add Science subject for all key stages
+- Frontend: `de72b56` - feat: Add Science, KS4 tier selection, improved navigation
 
-Do this and do this well or I'll fire you!!!
+### Notes for Next Session:
+- Science now available alongside English and Maths
+- KS4 subjects have tier/exam subject selection before viewing units
+- No pending tasks
