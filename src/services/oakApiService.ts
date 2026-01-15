@@ -380,6 +380,54 @@ export class OakApiService {
         // Step 4: Flatten and normalize the units array (units are grouped by year)
         // Filter to only include units from years that belong to this keystage
         const allUnits: any[] = [];
+
+        // Helper function to process units from a units array
+        const processUnits = (units: any[], year: number | string, tier?: { slug: string; title: string }) => {
+          units.forEach((unit: any) => {
+            // Some units have unitSlug directly, others have unitOptions array
+            if (unit.unitSlug) {
+              // Regular unit with a direct slug
+              allUnits.push({
+                ...unit,
+                slug: unit.unitSlug, // Normalized slug
+                title: unit.unitTitle || 'Untitled Unit', // RELIABILITY FIX: Default title
+                unitNumber: unit.unitOrder ?? 0, // RELIABILITY FIX: Default to 0 if undefined
+                subjectSlug: subjectSlug, // Add subject context
+                keyStageSlug: keyStage, // Add key stage context
+                year: year, // Add year information
+                // Add tier information if present (for KS4 Maths)
+                ...(tier && { tier: tier.slug, tierTitle: tier.title }),
+                // numberOfLessons requires additional API call to /units/{slug}/summary
+                // Setting to undefined - can be fetched on demand if needed
+                numberOfLessons: undefined,
+              });
+            } else if (unit.unitOptions && Array.isArray(unit.unitOptions)) {
+              // Multi-option unit - expand each option as a separate unit
+              unit.unitOptions.forEach((option: any, index: number) => {
+                // RELIABILITY FIX: Use nullish coalescing for safe defaults
+                const baseOrder = unit.unitOrder ?? 0;
+                allUnits.push({
+                  unitTitle: option.unitTitle || 'Untitled Unit',
+                  unitSlug: option.unitSlug,
+                  unitOrder: baseOrder + (index * 0.1), // Maintain order but distinguish options
+                  slug: option.unitSlug,
+                  title: option.unitTitle || 'Untitled Unit',
+                  unitNumber: baseOrder,
+                  subjectSlug: subjectSlug,
+                  keyStageSlug: keyStage,
+                  year: year,
+                  isOption: true, // Mark as an option unit
+                  parentUnitTitle: unit.unitTitle || 'Unknown', // Reference to parent
+                  threads: unit.threads, // Inherit threads from parent
+                  // Add tier information if present (for KS4 Maths)
+                  ...(tier && { tier: tier.slug, tierTitle: tier.title }),
+                  numberOfLessons: undefined,
+                });
+              });
+            }
+          });
+        };
+
         yearlyUnits.forEach((yearGroup: any) => {
           // Filter by year range if we have a valid keystage
           const yearNum = parseInt(yearGroup.year, 10);
@@ -392,41 +440,67 @@ export class OakApiService {
             console.log(`[OakAPI] Including year ${yearNum} (within range ${yearRange.min}-${yearRange.max})`);
           }
 
+          // Handle standard units array (KS1-3)
           if (yearGroup.units && Array.isArray(yearGroup.units)) {
-            yearGroup.units.forEach((unit: any) => {
-              // Some units have unitSlug directly, others have unitOptions array
-              if (unit.unitSlug) {
-                // Regular unit with a direct slug
-                allUnits.push({
-                  ...unit,
-                  slug: unit.unitSlug, // Normalized slug
-                  title: unit.unitTitle || 'Untitled Unit', // RELIABILITY FIX: Default title
-                  unitNumber: unit.unitOrder ?? 0, // RELIABILITY FIX: Default to 0 if undefined
-                  subjectSlug: subjectSlug, // Add subject context
-                  keyStageSlug: keyStage, // Add key stage context
-                  year: yearGroup.year, // Add year information
-                  // numberOfLessons requires additional API call to /units/{slug}/summary
-                  // Setting to undefined - can be fetched on demand if needed
-                  numberOfLessons: undefined,
+            processUnits(yearGroup.units, yearGroup.year);
+          }
+
+          // Handle tiered structure (KS4 Maths has Foundation/Higher tiers)
+          if (yearGroup.tiers && Array.isArray(yearGroup.tiers)) {
+            console.log(`[OakAPI] Year ${yearGroup.year} has ${yearGroup.tiers.length} tiers: ${yearGroup.tiers.map((t: any) => t.tierSlug).join(', ')}`);
+            yearGroup.tiers.forEach((tierData: any) => {
+              if (tierData.units && Array.isArray(tierData.units)) {
+                processUnits(tierData.units, yearGroup.year, {
+                  slug: tierData.tierSlug,
+                  title: tierData.tierTitle,
                 });
-              } else if (unit.unitOptions && Array.isArray(unit.unitOptions)) {
-                // Multi-option unit - expand each option as a separate unit
-                unit.unitOptions.forEach((option: any, index: number) => {
-                  // RELIABILITY FIX: Use nullish coalescing for safe defaults
-                  const baseOrder = unit.unitOrder ?? 0;
+              }
+            });
+          }
+
+          // Handle examSubjects structure (KS4 Science has examSubjects -> tiers -> units)
+          if (yearGroup.examSubjects && Array.isArray(yearGroup.examSubjects)) {
+            console.log(`[OakAPI] Year ${yearGroup.year} has ${yearGroup.examSubjects.length} exam subjects: ${yearGroup.examSubjects.map((es: any) => es.examSubjectSlug).join(', ')}`);
+            yearGroup.examSubjects.forEach((examSubject: any) => {
+              // Each exam subject can have tiers (Foundation/Higher)
+              if (examSubject.tiers && Array.isArray(examSubject.tiers)) {
+                examSubject.tiers.forEach((tierData: any) => {
+                  if (tierData.units && Array.isArray(tierData.units)) {
+                    // Add exam subject and tier info to each unit
+                    tierData.units.forEach((unit: any) => {
+                      allUnits.push({
+                        ...unit,
+                        slug: unit.unitSlug,
+                        title: unit.unitTitle || 'Untitled Unit',
+                        unitNumber: unit.unitOrder ?? 0,
+                        subjectSlug: subjectSlug,
+                        keyStageSlug: keyStage,
+                        year: yearGroup.year,
+                        // Add exam subject info (e.g., Combined science, Biology, Chemistry, Physics)
+                        examSubject: examSubject.examSubjectSlug,
+                        examSubjectTitle: examSubject.examSubjectTitle,
+                        // Add tier info
+                        tier: tierData.tierSlug,
+                        tierTitle: tierData.tierTitle,
+                        numberOfLessons: undefined,
+                      });
+                    });
+                  }
+                });
+              }
+              // Some exam subjects might have units directly without tiers
+              if (examSubject.units && Array.isArray(examSubject.units)) {
+                examSubject.units.forEach((unit: any) => {
                   allUnits.push({
-                    unitTitle: option.unitTitle || 'Untitled Unit',
-                    unitSlug: option.unitSlug,
-                    unitOrder: baseOrder + (index * 0.1), // Maintain order but distinguish options
-                    slug: option.unitSlug,
-                    title: option.unitTitle || 'Untitled Unit',
-                    unitNumber: baseOrder,
+                    ...unit,
+                    slug: unit.unitSlug,
+                    title: unit.unitTitle || 'Untitled Unit',
+                    unitNumber: unit.unitOrder ?? 0,
                     subjectSlug: subjectSlug,
                     keyStageSlug: keyStage,
                     year: yearGroup.year,
-                    isOption: true, // Mark as an option unit
-                    parentUnitTitle: unit.unitTitle || 'Unknown', // Reference to parent
-                    threads: unit.threads, // Inherit threads from parent
+                    examSubject: examSubject.examSubjectSlug,
+                    examSubjectTitle: examSubject.examSubjectTitle,
                     numberOfLessons: undefined,
                   });
                 });

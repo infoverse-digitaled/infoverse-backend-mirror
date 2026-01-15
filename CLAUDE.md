@@ -41,30 +41,26 @@
 
 ## Session Handoff Notes
 <!-- Claude should update this before session ends -->
-Last updated: 2026-01-13
-Status: Session complete - Science subject added, KS4 tier selection implemented
+Last updated: 2026-01-15
+Status: Session complete - Fixed Oak API rate limiting, deployed frontend
 
 ### Completed This Session:
-- Added Science subject for all key stages (KS1-KS4)
-- Implemented KS4 Maths tier selection UI (Foundation/Higher cards)
-- Implemented KS4 Science exam subject + tier selection UI
-  - Exam subjects: Combined Science, Biology, Chemistry, Physics
-  - Each with Foundation/Higher tiers
-- Fixed Back button navigation to preserve key stage selection
-- Browse page now uses URL params (?ks=4) to persist key stage tab
-- Removed grade descriptions from tier selection cards
-- Verified trial counter, inactivity-based countdown, and Paystack live mode
+- Fixed Oak API 429 rate limiting error by pre-warming Redis cache
+- Started backend and frontend dev servers
+- Pre-warmed cache for all 12 subject/keystage combinations (Maths, English, Science × KS1-4)
+- Deployed frontend to Netlify successfully
+- Backend deployment failed due to SSL/network issues (gcloud CLI)
 
-### Verified Systems:
-- Trial day counter: Working correctly (7 days from account creation)
-- Trial based on account creation, NOT user activity: Confirmed
-- Paystack mode: LIVE (with live plan codes)
+### Deployment Status:
+- Frontend: ✅ Deployed to https://infoversedigitaleducation.net
+- Backend: ✅ Running (Jan 13 build) - new deploy failed due to SSL errors
+- Production backend verified working at https://infoverse-backend-84498540486.europe-west1.run.app
 
-### Commits Made:
-- Backend: `c0a35fd` - feat: Add Science subject for all key stages
-- Frontend: `de72b56` - feat: Add Science, KS4 tier selection, improved navigation
+### Uncommitted Changes:
+- Backend: package.json, curriculum.ts, oakApiService.ts (minor changes)
+- Frontend: login page, home page, KeyStageSelector, SideLogo component
 
 ### Notes for Next Session:
-- Science now available alongside English and Maths
-- KS4 subjects have tier/exam subject selection before viewing units
-- No pending tasks
+- Backend needs redeployment when network is stable (has uncommitted changes)
+- SSL errors with gcloud CLI - try different network or deploy from Cloud Console
+- Oak API cache TTL: 12h for units, 24h for subjects/lessons
