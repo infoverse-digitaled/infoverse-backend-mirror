@@ -2,7 +2,11 @@
 
 ## Current Priorities
 <!-- Update this section each session -->
-- No pending tasks
+- Bug Report Feature (implemented, needs deployment & testing)
+
+## Nia Indexed Resources
+- ✅ `InfoverseDigitalEd/backend` - re-indexed 2026-01-29 (private, via GitHub app)
+- ✅ `InfoverseDigitalEd/frontend` - re-indexed 2026-01-29 (private, via GitHub app)
 
 ## Known Issues / Context
 - **KS4 Tiered Structure**: KS4 Maths and Science use Foundation/Higher tiers in Oak API. Fixed in Jan 2026 to parse `tiers` and `examSubjects` structures.
@@ -41,26 +45,22 @@
 
 ## Session Handoff Notes
 <!-- Claude should update this before session ends -->
-Last updated: 2026-01-15
-Status: Session complete - Fixed Oak API rate limiting, deployed frontend
+Last updated: 2026-01-30
+Status: Bug Report Feature implemented (backend + frontend)
 
-### Completed This Session:
-- Fixed Oak API 429 rate limiting error by pre-warming Redis cache
-- Started backend and frontend dev servers
-- Pre-warmed cache for all 12 subject/keystage combinations (Maths, English, Science × KS1-4)
-- Deployed frontend to Netlify successfully
-- Backend deployment failed due to SSL/network issues (gcloud CLI)
+### Completed This Session (2026-01-30):
+- **Bug Report Feature - Full Implementation:**
+  - Backend: `BugReport` model, `bugReportLimiter` (5/hr/IP), `POST /public/bug-report` endpoint, email worker job
+  - Frontend: `BugReportModal`, `BugReportButton` (floating, bottom-left), `useFeedbackTimer` hook (7-day interval), integrated into `LayoutWrapper`
+  - Includes: honeypot spam filter, auto-populated email/userId from auth, star rating, type selector
+  - Backend commit: `4aca376` on `main`
+  - Frontend commit: `564100c` on `main`
 
 ### Deployment Status:
-- Frontend: ✅ Deployed to https://infoversedigitaleducation.net
-- Backend: ✅ Running (Jan 13 build) - new deploy failed due to SSL errors
-- Production backend verified working at https://infoverse-backend-84498540486.europe-west1.run.app
-
-### Uncommitted Changes:
-- Backend: package.json, curriculum.ts, oakApiService.ts (minor changes)
-- Frontend: login page, home page, KeyStageSelector, SideLogo component
+- Frontend: ✅ Deployed to https://infoversedigitaleducation.net (needs redeploy for bug report feature)
+- Backend: ✅ Deployed (Jan 16 build) - needs redeploy for bug report feature
 
 ### Notes for Next Session:
-- Backend needs redeployment when network is stable (has uncommitted changes)
-- SSL errors with gcloud CLI - try different network or deploy from Cloud Console
+- **Deploy both repos** to get bug report feature live
+- **Test the feature end-to-end** after deployment (see verification steps in plan)
 - Oak API cache TTL: 12h for units, 24h for subjects/lessons
