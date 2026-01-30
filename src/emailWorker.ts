@@ -18,6 +18,25 @@ const sendPasswordResetEmail = async (job: any) => {
   await sendEmail(email, subject, text);
 };
 
+// Specific function for sending a bug report notification email
+const sendBugReportEmail = async (job: any) => {
+  const { type, message, rating, email, userId, page } = job.data;
+  const subject = `[Bug Report] New ${type} report received`;
+  const text = `A new ${type} report has been submitted.
+
+Type: ${type}
+Message: ${message}
+Rating: ${rating || 'Not provided'}
+User Email: ${email}
+User ID: ${userId}
+Page: ${page}
+
+---
+Submitted via Infoverse Bug Report System`;
+  console.log(`WORKER: Processing bug report notification`);
+  await sendEmail('support@infoversedigitaleducation.net', subject, text);
+};
+
 // Specific function for sending an enrollment confirmation email
 const sendEnrollmentConfirmationEmail = async (job: any) => {
   const { email, name, courseTitle } = job.data;
@@ -46,6 +65,9 @@ new Worker(
         break;
       case 'send-enrollment-confirmation':
         await sendEnrollmentConfirmationEmail(job);
+        break;
+      case 'send-bug-report':
+        await sendBugReportEmail(job);
         break;
       default:
         console.error(`WORKER: Unknown job name: ${job.name}`);

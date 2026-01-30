@@ -11,6 +11,15 @@ export const authLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// Limiter for bug report / feedback submissions
+export const bugReportLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // 5 reports per hour per IP
+    message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Too many reports from this IP. Please try again later.' }},
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // A more general limiter for all other API routes
 // Oak API allows 1000 req/min, so we set this very high
 // 10000 per 15min = ~667/min which is under Oak's limit but very generous
