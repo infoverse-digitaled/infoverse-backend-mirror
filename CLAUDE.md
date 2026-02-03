@@ -2,7 +2,8 @@
 
 ## Current Priorities
 <!-- Update this section each session -->
-- Bug Report Feature (implemented, needs deployment & testing)
+- Science subject now live (deployed 2026-02-03)
+- Bug Report Feature (needs frontend redeploy)
 
 ## Nia Indexed Resources
 - ✅ `InfoverseDigitalEd/backend` - re-indexed 2026-01-29 (private, via GitHub app)
@@ -11,6 +12,8 @@
 ## Known Issues / Context
 - **KS4 Tiered Structure**: KS4 Maths and Science use Foundation/Higher tiers in Oak API. Fixed in Jan 2026 to parse `tiers` and `examSubjects` structures.
 - **Keystage scrambling**: Was caused by wrong sequence selection + missing year filtering. Fixed in commit 7ce9997.
+- **Oak API Authentication Required**: Unauthenticated requests to `/lessons/{slug}/assets` return empty arrays. Always include API key.
+- **Paystack Live Mode**: Production is configured for live payments. Webhook must be enabled in Paystack dashboard.
 
 ## Architecture Decisions
 - Oak API caching: 12-24 hours TTL in Redis
@@ -45,22 +48,34 @@
 
 ## Session Handoff Notes
 <!-- Claude should update this before session ends -->
-Last updated: 2026-01-30
-Status: Bug Report Feature implemented (backend + frontend)
+Last updated: 2026-02-03
+Status: Science subject unblocked and deployed
 
-### Completed This Session (2026-01-30):
-- **Bug Report Feature - Full Implementation:**
-  - Backend: `BugReport` model, `bugReportLimiter` (5/hr/IP), `POST /public/bug-report` endpoint, email worker job
-  - Frontend: `BugReportModal`, `BugReportButton` (floating, bottom-left), `useFeedbackTimer` hook (7-day interval), integrated into `LayoutWrapper`
-  - Includes: honeypot spam filter, auto-populated email/userId from auth, star rating, type selector
-  - Backend commit: `4aca376` on `main`
-  - Frontend commit: `564100c` on `main`
+### Completed This Session (2026-02-03):
+- **Paystack Investigation:**
+  - Confirmed production is in LIVE mode (`PAYSTACK_MODE=live`)
+  - Fixed webhook - was toggled OFF in Paystack dashboard, now enabled
+  - Webhook URL: `https://infoverse-backend-84498540486.europe-west1.run.app/api/v1/payment/webhook`
+  - Secret keys match between Cloud Run and Paystack dashboard
+
+- **Oak API Science Investigation:**
+  - Received email from Oak dev (Remy Sharp) - they CAN get videos for Science lessons
+  - Discovered our Jan 15 audit was incorrect - Science has 100% video coverage
+  - Root cause: likely intermittent API issues during audit, or unauthenticated requests returning empty assets
+  - Key finding: Oak API returns empty assets array for unauthenticated requests
+
+- **Science Subject Unblocked:**
+  - Removed `'science'` from `BLOCKED_SUBJECTS` in `src/config/curriculum.ts`
+  - Added `'science'` to `ALLOWED_SUBJECTS` for KS1, KS2, KS3, KS4
+  - Verified 100% video coverage across all key stages (including KS4 tiers)
+  - Commit: `dca034c`
+  - Deployed: revision `infoverse-backend-00048-gv9`
 
 ### Deployment Status:
-- Frontend: ✅ Deployed to https://infoversedigitaleducation.net (needs redeploy for bug report feature)
-- Backend: ✅ Deployed (Jan 16 build) - needs redeploy for bug report feature
+- Backend: ✅ Deployed (Feb 3, 2026) - Science now available
+- Frontend: Needs redeploy for bug report feature
 
 ### Notes for Next Session:
-- **Deploy both repos** to get bug report feature live
-- **Test the feature end-to-end** after deployment (see verification steps in plan)
-- Oak API cache TTL: 12h for units, 24h for subjects/lessons
+- Reply to Oak (Remy Sharp) - confirm Science videos now working, apologize for confusion
+- Frontend needs redeploy to get bug report feature live
+- Consider re-running comprehensive audit with proper API authentication
