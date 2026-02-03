@@ -2,8 +2,7 @@
 export const PAID_SUBJECTS = ['german', 'french', 'latin', 'spanish'];
 
 // Blocked subjects - these will be filtered out entirely from all endpoints
-// Currently allowing english and maths only
-// Science blocked due to poor video coverage (only ~15% of lessons have video)
+// Currently allowing english, maths, and science
 export const BLOCKED_SUBJECTS = [
   'geography',
   'history',
@@ -18,13 +17,12 @@ export const BLOCKED_SUBJECTS = [
   'german',
   'spanish',
   'latin',
-  'science', // Blocked: poor video coverage across all key stages
 ];
 
-// Allowed subjects per key stage - english and maths only
+// Allowed subjects per key stage - english, maths, and science
 export const ALLOWED_SUBJECTS: Record<string, string[]> = {
-  'ks1': ['english', 'maths'],
-  'ks2': ['english', 'maths'],
-  'ks3': ['english', 'maths'],
-  'ks4': ['english', 'maths'],
+  'ks1': ['english', 'maths', 'science'],
+  'ks2': ['english', 'maths', 'science'],
+  'ks3': ['english', 'maths', 'science'],
+  'ks4': ['english', 'maths', 'science'],
 };
