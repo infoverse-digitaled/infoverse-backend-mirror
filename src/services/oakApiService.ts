@@ -517,6 +517,34 @@ export class OakApiService {
   }
 
   /**
+   * Handle 404 from Oak API for unit-level endpoints.
+   * When Oak changes unit slugs, cached slugs become stale.
+   * Invalidates related caches so fresh data gets fetched on the next browse.
+   */
+  private async handleStaleUnitSlug(unitSlug: string): Promise<void> {
+    console.warn(`[OakAPI] Unit slug '${unitSlug}' returned 404 - likely stale due to Oak content restructuring`);
+
+    // Clear unit-specific cache entries
+    try {
+      await this.redis.del(`oak:unit:${unitSlug}:details`);
+      await this.redis.del(`oak:unit:${unitSlug}:lessons`);
+    } catch (e) {
+      console.error('[OakAPI] Failed to clear unit cache:', e);
+    }
+
+    // Clear all unit listing caches so the next browse gets fresh slugs from Oak
+    try {
+      const unitListKeys = await this.redis.keys('oak:keystage:*:subject:*:units');
+      if (unitListKeys.length > 0) {
+        await this.redis.del(...unitListKeys);
+        console.log(`[OakAPI] Invalidated ${unitListKeys.length} unit listing cache(s) due to stale slug '${unitSlug}'`);
+      }
+    } catch (e) {
+      console.error('[OakAPI] Failed to clear unit listing caches:', e);
+    }
+  }
+
+  /**
    * Get unit details by slug
    * Fetches unit information from the Oak API
    */
@@ -539,7 +567,11 @@ export class OakApiService {
           title: unitDetails.unitTitle,
           numberOfLessons: unitLessons?.length || 0,
         };
-      } catch (error) {
+      } catch (error: any) {
+        // On 404, invalidate stale caches so next browse gets fresh slugs
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          await this.handleStaleUnitSlug(unitSlug);
+        }
         return this.handleApiError(error);
       }
     });
@@ -585,7 +617,11 @@ export class OakApiService {
           subjectSlug: subjectSlug, // Add subject info from unit for freemium logic
           keyStageSlug: keyStageSlug, // Add keystage info from unit
         }));
-      } catch (error) {
+      } catch (error: any) {
+        // On 404, invalidate stale caches so next browse gets fresh slugs
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          await this.handleStaleUnitSlug(unitSlug);
+        }
         return this.handleApiError(error);
       }
     });
