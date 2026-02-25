@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "nodemon --watch src --ext ts --exec ts-node -r dotenv/config src/app.ts",
-    "nodemon": "nodemon --exec ts-node src/app.ts",
+    "nodemon": "nodemon --exec ts-node -r dotenv/config src/app.ts",
     "commit": "cz",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
