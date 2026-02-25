@@ -1,11 +1,11 @@
 steps:
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/infoverse-backend:$COMMIT_SHA', '.']
+    args: ['build', '-t', '$_DEPLOY_REGION-docker.pkg.dev/$PROJECT_ID/infoverse/backend:$COMMIT_SHA', '.']
 
-  # Step 2: Push the image to Artifact Registry / Container Registry
+  # Step 2: Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/infoverse-backend:$COMMIT_SHA']
+    args: ['push', '$_DEPLOY_REGION-docker.pkg.dev/$PROJECT_ID/infoverse/backend:$COMMIT_SHA']
 
   # Step 3: Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -14,7 +14,7 @@ steps:
       - 'deploy'
       - 'infoverse-backend'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/infoverse-backend:$COMMIT_SHA'
+      - '$_DEPLOY_REGION-docker.pkg.dev/$PROJECT_ID/infoverse/backend:$COMMIT_SHA'
       - '--region'
       - '$_DEPLOY_REGION'
       - '--platform'
@@ -27,4 +27,4 @@ options:
 
 # Substitutions allow you to change the region in the GCP UI without editing this file
 substitutions:
-  _DEPLOY_REGION: us-central1
+  _DEPLOY_REGION: europe-west1
