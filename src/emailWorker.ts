@@ -1,5 +1,6 @@
 import { Worker } from 'bullmq';
-import config from './config';
+import { redisConnection } from './utils/emailQueue';
+
 
 // Generic email sending function
 const sendEmail = async (to: string, subject: string, text: string) => {
@@ -73,5 +74,5 @@ new Worker(
         console.error(`WORKER: Unknown job name: ${job.name}`);
     }
   },
-  { connection: config.redis.url as any },
+  { connection: redisConnection },
 );
