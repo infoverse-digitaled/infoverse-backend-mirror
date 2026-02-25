@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 // WARNING: Higher limits increase vulnerability to brute force attacks
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200,
+    max: 10,
     message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Too many authentication attempts from this IP, please try again after 15 minutes'}},
     standardHeaders: true,
     legacyHeaders: false,

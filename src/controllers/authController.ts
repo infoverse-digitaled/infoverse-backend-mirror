@@ -229,7 +229,7 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     // 4. Send the token to the user's email
     try {
-      const resetURL = `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${resetToken}`;
+      const resetURL = `${config.frontendUrl}/reset-password/${resetToken}`;
       const message = `Forgot your password? Click the link to reset it: ${resetURL}\n\nIf you didn't forget your password, please ignore this email. This link is valid for 10 minutes.`;
 
       // Add email job to the queue
