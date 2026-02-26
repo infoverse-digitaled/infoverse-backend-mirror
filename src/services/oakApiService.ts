@@ -283,7 +283,8 @@ export class OakApiService {
   async getUnits(keyStage: string, subjectSlug: string): Promise<any[]> {
     const cacheKey = `oak:keystage:${keyStage}:subject:${subjectSlug}:units`;
 
-    return this.getCached(cacheKey, CACHE_TTL.UNITS, async () => {
+    // Fetch the raw list (potentially from cache)
+    const rawUnits = await this.getCached(cacheKey, CACHE_TTL.UNITS, async () => {
       this.checkRateLimit();
 
       try {
@@ -293,18 +294,12 @@ export class OakApiService {
         const subjectResponse = await this.axiosInstance.get<any>(`/subjects/${subjectSlug}`);
         const subjectData = this.unwrap<any>(subjectResponse.data);
 
-        // RELIABILITY FIX: Validate subjectData exists
         if (!subjectData) {
           console.warn(`[OakAPI] No subject data returned for ${subjectSlug}`);
           return [];
         }
 
-        // Log available sequences for debugging
-        console.log(`[OakAPI] Subject ${subjectSlug} has ${subjectData.sequenceSlugs?.length || 0} sequences`);
-
         // Step 2: Find the BEST sequence for the requested key stage
-        // Oak API can have overlapping sequences (e.g., english-primary covers KS1-3, english-secondary covers KS3-4)
-        // We need to pick the most appropriate one, not just the first match
         const candidateSequences = subjectData.sequenceSlugs?.filter((seq: any) =>
           seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage)
         ) || [];
@@ -314,16 +309,12 @@ export class OakApiService {
           return [];
         }
 
-        // Select the best sequence based on keystage level
-        // KS1, KS2 should prefer "primary" sequences
-        // KS3, KS4 should prefer "secondary" sequences
         const isSecondaryLevel = keyStage === 'ks3' || keyStage === 'ks4';
         const isPrimaryLevel = keyStage === 'ks1' || keyStage === 'ks2';
 
-        let matchingSequence = candidateSequences[0]; // Default to first match
+        let matchingSequence = candidateSequences[0];
 
         if (candidateSequences.length > 1) {
-          // Multiple sequences match - pick the best one
           const bestMatch = candidateSequences.find((seq: any) => {
             const seqSlug = (seq.sequenceSlug || '').toLowerCase();
             if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
@@ -334,18 +325,16 @@ export class OakApiService {
           if (bestMatch) {
             matchingSequence = bestMatch;
           } else {
-            // Fallback: prefer sequence where keystage is NOT at the boundary
-            // (i.e., sequence with fewer keystages, or where our keystage is more central)
             const sorted = candidateSequences.sort((a: any, b: any) => {
               const aKeyStages = a.keyStages?.length || 0;
               const bKeyStages = b.keyStages?.length || 0;
-              return aKeyStages - bKeyStages; // Prefer more specific (fewer keystages)
+              return aKeyStages - bKeyStages;
             });
             matchingSequence = sorted[0];
           }
         }
 
-        console.log(`[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug} (from ${candidateSequences.length} candidates)`);
+        console.log(`[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug}`);
 
         // Step 3: Fetch units for this sequence
         const unitsResponse = await this.axiosInstance.get<any>(
@@ -353,73 +342,51 @@ export class OakApiService {
         );
         const yearlyUnits = this.unwrap<any[]>(unitsResponse.data);
 
-        // RELIABILITY FIX: Validate yearlyUnits is an array
         if (!yearlyUnits || !Array.isArray(yearlyUnits)) {
-          console.warn(`Expected array from units API for sequence ${matchingSequence.sequenceSlug}, got:`, typeof yearlyUnits);
           return [];
         }
 
-        // Define year ranges for each key stage (UK National Curriculum)
         const keyStageYearRanges: Record<string, { min: number; max: number }> = {
-          'ks1': { min: 1, max: 2 },   // Years 1-2 (ages 5-7)
-          'ks2': { min: 3, max: 6 },   // Years 3-6 (ages 7-11)
-          'ks3': { min: 7, max: 9 },   // Years 7-9 (ages 11-14)
-          'ks4': { min: 10, max: 11 }, // Years 10-11 (ages 14-16)
+          'ks1': { min: 1, max: 2 },
+          'ks2': { min: 3, max: 6 },
+          'ks3': { min: 7, max: 9 },
+          'ks4': { min: 10, max: 11 },
         };
 
         const yearRange = keyStageYearRanges[keyStage];
-        if (!yearRange) {
-          console.warn(`[OakAPI] Unknown keyStage: ${keyStage}, returning all units`);
-        } else {
-          console.log(`[OakAPI] Year range for ${keyStage}: ${yearRange.min}-${yearRange.max}`);
-        }
-
-        // Log all year groups available
-        console.log(`[OakAPI] Available year groups: ${yearlyUnits.map((yg: any) => yg.year).join(', ')}`);
-
-        // Step 4: Flatten and normalize the units array (units are grouped by year)
-        // Filter to only include units from years that belong to this keystage
         const allUnits: any[] = [];
 
-        // Helper function to process units from a units array
+        // Helper function to process units
         const processUnits = (units: any[], year: number | string, tier?: { slug: string; title: string }) => {
           units.forEach((unit: any) => {
-            // Some units have unitSlug directly, others have unitOptions array
             if (unit.unitSlug) {
-              // Regular unit with a direct slug
               allUnits.push({
                 ...unit,
-                slug: unit.unitSlug, // Normalized slug
-                title: unit.unitTitle || 'Untitled Unit', // RELIABILITY FIX: Default title
-                unitNumber: unit.unitOrder ?? 0, // RELIABILITY FIX: Default to 0 if undefined
-                subjectSlug: subjectSlug, // Add subject context
-                keyStageSlug: keyStage, // Add key stage context
-                year: year, // Add year information
-                // Add tier information if present (for KS4 Maths)
+                slug: unit.unitSlug,
+                title: unit.unitTitle || 'Untitled Unit',
+                unitNumber: unit.unitOrder ?? 0,
+                subjectSlug: subjectSlug,
+                keyStageSlug: keyStage,
+                year: year,
                 ...(tier && { tier: tier.slug, tierTitle: tier.title }),
-                // numberOfLessons requires additional API call to /units/{slug}/summary
-                // Setting to undefined - can be fetched on demand if needed
                 numberOfLessons: undefined,
               });
             } else if (unit.unitOptions && Array.isArray(unit.unitOptions)) {
-              // Multi-option unit - expand each option as a separate unit
               unit.unitOptions.forEach((option: any, index: number) => {
-                // RELIABILITY FIX: Use nullish coalescing for safe defaults
                 const baseOrder = unit.unitOrder ?? 0;
                 allUnits.push({
                   unitTitle: option.unitTitle || 'Untitled Unit',
                   unitSlug: option.unitSlug,
-                  unitOrder: baseOrder + (index * 0.1), // Maintain order but distinguish options
+                  unitOrder: baseOrder + (index * 0.1),
                   slug: option.unitSlug,
                   title: option.unitTitle || 'Untitled Unit',
                   unitNumber: baseOrder,
                   subjectSlug: subjectSlug,
                   keyStageSlug: keyStage,
                   year: year,
-                  isOption: true, // Mark as an option unit
-                  parentUnitTitle: unit.unitTitle || 'Unknown', // Reference to parent
-                  threads: unit.threads, // Inherit threads from parent
-                  // Add tier information if present (for KS4 Maths)
+                  isOption: true,
+                  parentUnitTitle: unit.unitTitle || 'Unknown',
+                  threads: unit.threads,
                   ...(tier && { tier: tier.slug, tierTitle: tier.title }),
                   numberOfLessons: undefined,
                 });
@@ -429,25 +396,16 @@ export class OakApiService {
         };
 
         yearlyUnits.forEach((yearGroup: any) => {
-          // Filter by year range if we have a valid keystage
           const yearNum = parseInt(yearGroup.year, 10);
           if (yearRange && !isNaN(yearNum)) {
-            if (yearNum < yearRange.min || yearNum > yearRange.max) {
-              // Skip this year group - it doesn't belong to this keystage
-              console.log(`[OakAPI] Skipping year ${yearNum} (outside range ${yearRange.min}-${yearRange.max})`);
-              return;
-            }
-            console.log(`[OakAPI] Including year ${yearNum} (within range ${yearRange.min}-${yearRange.max})`);
+            if (yearNum < yearRange.min || yearNum > yearRange.max) return;
           }
 
-          // Handle standard units array (KS1-3)
           if (yearGroup.units && Array.isArray(yearGroup.units)) {
             processUnits(yearGroup.units, yearGroup.year);
           }
 
-          // Handle tiered structure (KS4 Maths has Foundation/Higher tiers)
           if (yearGroup.tiers && Array.isArray(yearGroup.tiers)) {
-            console.log(`[OakAPI] Year ${yearGroup.year} has ${yearGroup.tiers.length} tiers: ${yearGroup.tiers.map((t: any) => t.tierSlug).join(', ')}`);
             yearGroup.tiers.forEach((tierData: any) => {
               if (tierData.units && Array.isArray(tierData.units)) {
                 processUnits(tierData.units, yearGroup.year, {
@@ -458,15 +416,11 @@ export class OakApiService {
             });
           }
 
-          // Handle examSubjects structure (KS4 Science has examSubjects -> tiers -> units)
           if (yearGroup.examSubjects && Array.isArray(yearGroup.examSubjects)) {
-            console.log(`[OakAPI] Year ${yearGroup.year} has ${yearGroup.examSubjects.length} exam subjects: ${yearGroup.examSubjects.map((es: any) => es.examSubjectSlug).join(', ')}`);
             yearGroup.examSubjects.forEach((examSubject: any) => {
-              // Each exam subject can have tiers (Foundation/Higher)
               if (examSubject.tiers && Array.isArray(examSubject.tiers)) {
                 examSubject.tiers.forEach((tierData: any) => {
                   if (tierData.units && Array.isArray(tierData.units)) {
-                    // Add exam subject and tier info to each unit
                     tierData.units.forEach((unit: any) => {
                       allUnits.push({
                         ...unit,
@@ -476,10 +430,8 @@ export class OakApiService {
                         subjectSlug: subjectSlug,
                         keyStageSlug: keyStage,
                         year: yearGroup.year,
-                        // Add exam subject info (e.g., Combined science, Biology, Chemistry, Physics)
                         examSubject: examSubject.examSubjectSlug,
                         examSubjectTitle: examSubject.examSubjectTitle,
-                        // Add tier info
                         tier: tierData.tierSlug,
                         tierTitle: tierData.tierTitle,
                         numberOfLessons: undefined,
@@ -488,7 +440,6 @@ export class OakApiService {
                   }
                 });
               }
-              // Some exam subjects might have units directly without tiers
               if (examSubject.units && Array.isArray(examSubject.units)) {
                 examSubject.units.forEach((unit: any) => {
                   allUnits.push({
@@ -514,6 +465,40 @@ export class OakApiService {
         return this.handleApiError(error);
       }
     });
+
+    // Step 5: De-duplicate, filter blacklisted units, and RE-INDEX
+    try {
+      const blacklist = await this.redis.keys('oak:blacklist:unit:*');
+      const blacklistedSlugs = blacklist.map(key => key.replace('oak:blacklist:unit:', ''));
+      
+      const seenSlugs = new Set<string>();
+      const filteredUnits: any[] = [];
+
+      for (const unit of rawUnits) {
+        const slug = unit.unitSlug || unit.slug;
+        
+        // Skip if already seen (de-duplicate tiers/options)
+        if (seenSlugs.has(slug)) continue;
+        
+        // Skip if blacklisted (broken/404)
+        if (blacklistedSlugs.includes(slug)) continue;
+
+        seenSlugs.add(slug);
+        filteredUnits.push(unit);
+      }
+
+      console.log(`[OakAPI] List processed: ${rawUnits.length} raw -> ${filteredUnits.length} unique units for ${keyStage}/${subjectSlug}`);
+
+      // Re-index to ensure sequential unit numbers (1, 2, 3...)
+      return filteredUnits.map((unit: any, index: number) => ({
+        ...unit,
+        unitNumber: index + 1
+      }));
+
+    } catch (e) {
+      console.error('[OakAPI] Failed to fetch blacklist or re-index:', e);
+      return rawUnits;
+    }
   }
 
   /**
@@ -539,8 +524,14 @@ export class OakApiService {
         await this.redis.del(...unitListKeys);
         console.log(`[OakAPI] Invalidated ${unitListKeys.length} unit listing cache(s) due to stale slug '${unitSlug}'`);
       }
+
+      // ADD TO BLACKLIST: Hide this unit for 24 hours
+      const blacklistKey = `oak:blacklist:unit:${unitSlug}`;
+      await this.redis.setEx(blacklistKey, 24 * 60 * 60, 'stale');
+      console.log(`[OakAPI] Blacklisted unit '${unitSlug}' for 24 hours`);
+
     } catch (e) {
-      console.error('[OakAPI] Failed to clear unit listing caches:', e);
+      console.error('[OakAPI] Failed to clear unit listing caches or update blacklist:', e);
     }
   }
 
