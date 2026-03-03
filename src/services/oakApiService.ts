@@ -466,24 +466,19 @@ export class OakApiService {
       }
     });
 
-    // Step 5: De-duplicate, filter blacklisted units, and RE-INDEX
+    // Step 5: Filter blacklisted units, and RE-INDEX
     try {
       const blacklist = await this.redis.keys('oak:blacklist:unit:*');
       const blacklistedSlugs = blacklist.map(key => key.replace('oak:blacklist:unit:', ''));
       
-      const seenSlugs = new Set<string>();
       const filteredUnits: any[] = [];
 
       for (const unit of rawUnits) {
         const slug = unit.unitSlug || unit.slug;
         
-        // Skip if already seen (de-duplicate tiers/options)
-        if (seenSlugs.has(slug)) continue;
-        
-        // Skip if blacklisted (broken/404)
+        // Skip if blacklisted (broken/404/400)
         if (blacklistedSlugs.includes(slug)) continue;
 
-        seenSlugs.add(slug);
         filteredUnits.push(unit);
       }
 
