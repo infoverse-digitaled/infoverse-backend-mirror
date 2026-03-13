@@ -5,8 +5,8 @@ import config from '../config';
 const { combine, timestamp, printf, colorize, align } = winston.format;
 
 // Custom log format
-const logFormat = printf(({ level, message, timestamp }) => {
-  return `${timestamp} ${level}: ${message}`;
+const logFormat = printf(({ level, message, timestamp, stack }) => {
+  return `${timestamp} ${level}: ${message}${stack ? `\n${stack}` : ''}`;
 });
 
 // Build transports based on environment
@@ -28,6 +28,7 @@ if (config.env !== 'production') {
 const logger = winston.createLogger({
   level: config.logLevel,
   format: combine(
+    winston.format.errors({ stack: true }),
     colorize({ all: true }),
     timestamp({
       format: 'YYYY-MM-DD hh:mm:ss.SSS A',

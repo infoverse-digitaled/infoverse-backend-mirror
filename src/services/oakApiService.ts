@@ -18,6 +18,7 @@ import {
   OakApiError,
 } from './oakApiTypes';
 import redisClient from '../config/redis'; // Direct import of the Redis client
+import { BLOCKED_UNIT_SLUGS } from '../config/oakBlockedUnits'; // Static hardcoded blocklist
 
 /**
  * Cache Time-To-Live (TTL) values in seconds
@@ -56,14 +57,16 @@ export class OakApiService {
 
   constructor(redisClientParam?: RedisClientInterface, axiosInstance?: AxiosInstance) {
     this.redis = redisClientParam || redisClient; // Use the directly imported redisClient
-    this.axiosInstance = axiosInstance || axios.create({
-      baseURL: config.oak.apiBaseUrl,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.oak.apiKey && { Authorization: `Bearer ${config.oak.apiKey}` }),
-      },
-      timeout: 30000, // 30 seconds
-    });
+    this.axiosInstance =
+      axiosInstance ||
+      axios.create({
+        baseURL: config.oak.apiBaseUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.oak.apiKey && { Authorization: `Bearer ${config.oak.apiKey}` }),
+        },
+        timeout: 30000, // 30 seconds
+      });
 
     this.rateLimitRemaining = config.oak.rateLimit;
     this.rateLimitReset = null;
@@ -84,7 +87,7 @@ export class OakApiService {
 
         return response;
       },
-      (error) => {
+      async (error) => {
         if (error.response?.status === 429) {
           this.rateLimitRemaining = 0;
           const retryAfter = error.response.headers['retry-after'];
@@ -92,6 +95,34 @@ export class OakApiService {
             this.rateLimitReset = new Date(Date.now() + parseInt(retryAfter, 10) * 1000);
           }
         }
+
+        // --- RETRY LOGIC FOR TIMEOUTS & SERVER ERRORS ---
+        const config = error.config as any;
+        if (config) {
+          if (!config.retryCount) {
+            config.retryCount = 0;
+          }
+
+          const maxRetries = 2;
+          const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+          const isServerError = error.response && error.response.status >= 500;
+          const isRateLimit = error.response?.status === 429;
+
+          if ((isTimeout || isServerError || isRateLimit) && config.retryCount < maxRetries) {
+            config.retryCount += 1;
+            console.warn(
+              `[OakAPI] Request failed (${error.message}). Retrying (${config.retryCount}/${maxRetries})...`,
+            );
+
+            // Exponential backoff
+            const delay = isRateLimit ? 5000 : 1000 * 2 ** config.retryCount;
+
+            return new Promise((resolve) => setTimeout(resolve, delay)).then(() =>
+              this.axiosInstance(config),
+            );
+          }
+        }
+
         return Promise.reject(error);
       },
     );
@@ -129,12 +160,18 @@ export class OakApiService {
             console.log(`[OakAPI Cache] HIT for key: ${cacheKey}`);
             return JSON.parse(cached) as T;
           } catch (parseError) {
-            console.error(`[OakAPI Cache] Parse error for key ${cacheKey}, clearing corrupted cache:`, parseError);
+            console.error(
+              `[OakAPI Cache] Parse error for key ${cacheKey}, clearing corrupted cache:`,
+              parseError,
+            );
             // Delete corrupted cache entry and fall through to fetch fresh data
             try {
               await this.redis.del(cacheKey);
             } catch (delError) {
-              console.error(`[OakAPI Cache] Failed to delete corrupted cache key ${cacheKey}:`, delError);
+              console.error(
+                `[OakAPI Cache] Failed to delete corrupted cache key ${cacheKey}:`,
+                delError,
+              );
             }
           }
         } else {
@@ -166,6 +203,12 @@ export class OakApiService {
    * Handle API errors and transform them into a consistent format
    */
   private handleApiError(error: unknown): never {
+    // Add debugging log to see what exactly is blowing up
+    console.error(
+      '[OakAPI] handleApiError caught:',
+      error instanceof Error ? error.message : error,
+    );
+
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<OakApiError>;
 
@@ -300,12 +343,15 @@ export class OakApiService {
         }
 
         // Step 2: Find the BEST sequence for the requested key stage
-        const candidateSequences = subjectData.sequenceSlugs?.filter((seq: any) =>
-          seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage)
-        ) || [];
+        const candidateSequences =
+          subjectData.sequenceSlugs?.filter((seq: any) =>
+            seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage),
+          ) || [];
 
         if (candidateSequences.length === 0) {
-          console.warn(`[OakAPI] No matching sequence found for keyStage=${keyStage} in subject=${subjectSlug}`);
+          console.warn(
+            `[OakAPI] No matching sequence found for keyStage=${keyStage} in subject=${subjectSlug}`,
+          );
           return [];
         }
 
@@ -334,11 +380,13 @@ export class OakApiService {
           }
         }
 
-        console.log(`[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug}`);
+        console.log(
+          `[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug}`,
+        );
 
         // Step 3: Fetch units for this sequence
         const unitsResponse = await this.axiosInstance.get<any>(
-          `/sequences/${matchingSequence.sequenceSlug}/units`
+          `/sequences/${matchingSequence.sequenceSlug}/units`,
         );
         const yearlyUnits = this.unwrap<any[]>(unitsResponse.data);
 
@@ -347,17 +395,21 @@ export class OakApiService {
         }
 
         const keyStageYearRanges: Record<string, { min: number; max: number }> = {
-          'ks1': { min: 1, max: 2 },
-          'ks2': { min: 3, max: 6 },
-          'ks3': { min: 7, max: 9 },
-          'ks4': { min: 10, max: 11 },
+          ks1: { min: 1, max: 2 },
+          ks2: { min: 3, max: 6 },
+          ks3: { min: 7, max: 9 },
+          ks4: { min: 10, max: 11 },
         };
 
         const yearRange = keyStageYearRanges[keyStage];
         const allUnits: any[] = [];
 
         // Helper function to process units
-        const processUnits = (units: any[], year: number | string, tier?: { slug: string; title: string }) => {
+        const processUnits = (
+          units: any[],
+          year: number | string,
+          tier?: { slug: string; title: string },
+        ) => {
           units.forEach((unit: any) => {
             if (unit.unitSlug) {
               allUnits.push({
@@ -365,9 +417,9 @@ export class OakApiService {
                 slug: unit.unitSlug,
                 title: unit.unitTitle || 'Untitled Unit',
                 unitNumber: unit.unitOrder ?? 0,
-                subjectSlug: subjectSlug,
+                subjectSlug,
                 keyStageSlug: keyStage,
-                year: year,
+                year,
                 ...(tier && { tier: tier.slug, tierTitle: tier.title }),
                 numberOfLessons: undefined,
               });
@@ -377,13 +429,13 @@ export class OakApiService {
                 allUnits.push({
                   unitTitle: option.unitTitle || 'Untitled Unit',
                   unitSlug: option.unitSlug,
-                  unitOrder: baseOrder + (index * 0.1),
+                  unitOrder: baseOrder + index * 0.1,
                   slug: option.unitSlug,
                   title: option.unitTitle || 'Untitled Unit',
                   unitNumber: baseOrder,
-                  subjectSlug: subjectSlug,
+                  subjectSlug,
                   keyStageSlug: keyStage,
-                  year: year,
+                  year,
                   isOption: true,
                   parentUnitTitle: unit.unitTitle || 'Unknown',
                   threads: unit.threads,
@@ -427,7 +479,7 @@ export class OakApiService {
                         slug: unit.unitSlug,
                         title: unit.unitTitle || 'Untitled Unit',
                         unitNumber: unit.unitOrder ?? 0,
-                        subjectSlug: subjectSlug,
+                        subjectSlug,
                         keyStageSlug: keyStage,
                         year: yearGroup.year,
                         examSubject: examSubject.examSubjectSlug,
@@ -447,7 +499,7 @@ export class OakApiService {
                     slug: unit.unitSlug,
                     title: unit.unitTitle || 'Untitled Unit',
                     unitNumber: unit.unitOrder ?? 0,
-                    subjectSlug: subjectSlug,
+                    subjectSlug,
                     keyStageSlug: keyStage,
                     year: yearGroup.year,
                     examSubject: examSubject.examSubjectSlug,
@@ -466,67 +518,31 @@ export class OakApiService {
       }
     });
 
-    // Step 5: Filter blacklisted units, and RE-INDEX
+    // Step 5: Filter blocked/unavailable units and RE-INDEX
     try {
-      const blacklist = await this.redis.keys('oak:blacklist:unit:*');
-      const blacklistedSlugs = blacklist.map(key => key.replace('oak:blacklist:unit:', ''));
-      
       const filteredUnits: any[] = [];
 
       for (const unit of rawUnits) {
         const slug = unit.unitSlug || unit.slug;
-        
-        // Skip if blacklisted (broken/404/400)
-        if (blacklistedSlugs.includes(slug)) continue;
+
+        // Skip if in the static hardcoded blocklist (known broken/copyright)
+        if (BLOCKED_UNIT_SLUGS.has(slug)) continue;
 
         filteredUnits.push(unit);
       }
 
-      console.log(`[OakAPI] List processed: ${rawUnits.length} raw -> ${filteredUnits.length} unique units for ${keyStage}/${subjectSlug}`);
+      console.log(
+        `[OakAPI] List processed: ${rawUnits.length} raw -> ${filteredUnits.length} units for ${keyStage}/${subjectSlug}`,
+      );
 
       // Re-index to ensure sequential unit numbers (1, 2, 3...)
       return filteredUnits.map((unit: any, index: number) => ({
         ...unit,
-        unitNumber: index + 1
+        unitNumber: index + 1,
       }));
-
     } catch (e) {
-      console.error('[OakAPI] Failed to fetch blacklist or re-index:', e);
+      console.error('[OakAPI] Failed to filter or re-index units:', e);
       return rawUnits;
-    }
-  }
-
-  /**
-   * Handle 404 from Oak API for unit-level endpoints.
-   * When Oak changes unit slugs, cached slugs become stale.
-   * Invalidates related caches so fresh data gets fetched on the next browse.
-   */
-  private async handleStaleUnitSlug(unitSlug: string): Promise<void> {
-    console.warn(`[OakAPI] Unit slug '${unitSlug}' returned 404 - likely stale due to Oak content restructuring`);
-
-    // Clear unit-specific cache entries
-    try {
-      await this.redis.del(`oak:unit:${unitSlug}:details`);
-      await this.redis.del(`oak:unit:${unitSlug}:lessons`);
-    } catch (e) {
-      console.error('[OakAPI] Failed to clear unit cache:', e);
-    }
-
-    // Clear all unit listing caches so the next browse gets fresh slugs from Oak
-    try {
-      const unitListKeys = await this.redis.keys('oak:keystage:*:subject:*:units');
-      if (unitListKeys.length > 0) {
-        await this.redis.del(...unitListKeys);
-        console.log(`[OakAPI] Invalidated ${unitListKeys.length} unit listing cache(s) due to stale slug '${unitSlug}'`);
-      }
-
-      // ADD TO BLACKLIST: Hide this unit for 24 hours
-      const blacklistKey = `oak:blacklist:unit:${unitSlug}`;
-      await this.redis.setEx(blacklistKey, 24 * 60 * 60, 'stale');
-      console.log(`[OakAPI] Blacklisted unit '${unitSlug}' for 24 hours`);
-
-    } catch (e) {
-      console.error('[OakAPI] Failed to clear unit listing caches or update blacklist:', e);
     }
   }
 
@@ -554,10 +570,6 @@ export class OakApiService {
           numberOfLessons: unitLessons?.length || 0,
         };
       } catch (error: any) {
-        // On 404, invalidate stale caches so next browse gets fresh slugs
-        if (axios.isAxiosError(error) && error.response?.status === 404) {
-          await this.handleStaleUnitSlug(unitSlug);
-        }
         return this.handleApiError(error);
       }
     });
@@ -600,14 +612,10 @@ export class OakApiService {
           ...lesson,
           slug: lesson.lessonSlug, // Add normalized 'slug' field for frontend compatibility
           title: lesson.lessonTitle, // Add normalized 'title' field
-          subjectSlug: subjectSlug, // Add subject info from unit for freemium logic
-          keyStageSlug: keyStageSlug, // Add keystage info from unit
+          subjectSlug, // Add subject info from unit for freemium logic
+          keyStageSlug, // Add keystage info from unit
         }));
       } catch (error: any) {
-        // On 404, invalidate stale caches so next browse gets fresh slugs
-        if (axios.isAxiosError(error) && error.response?.status === 404) {
-          await this.handleStaleUnitSlug(unitSlug);
-        }
         return this.handleApiError(error);
       }
     });
@@ -717,7 +725,7 @@ export class OakApiService {
 
       try {
         const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/assets`);
-        const data = response.data;
+        const { data } = response;
 
         // Rewrite Oak API URLs to use our backend proxy
         if (data.assets && Array.isArray(data.assets)) {
@@ -745,7 +753,15 @@ export class OakApiService {
    * NOTE: We explicitly DO NOT pass through Oak API headers to avoid CORS conflicts
    * Note: Not all lessons have all asset types - throws custom error for 404
    */
-  async getAssetFile(lessonSlug: string, assetType: string): Promise<{ stream: any; contentType: string; contentDisposition?: string; contentLength?: string }> {
+  async getAssetFile(
+    lessonSlug: string,
+    assetType: string,
+  ): Promise<{
+    stream: any;
+    contentType: string;
+    contentDisposition?: string;
+    contentLength?: string;
+  }> {
     this.checkRateLimit();
 
     try {
@@ -755,7 +771,7 @@ export class OakApiService {
         baseURL: config.oak.apiBaseUrl,
         headers: {
           ...(config.oak.apiKey && { Authorization: `Bearer ${config.oak.apiKey}` }),
-          'Accept': '*/*',
+          Accept: '*/*',
           'User-Agent': 'Infoverse-Backend/1.0',
         },
         timeout: 120000, // 2 minutes
@@ -768,13 +784,10 @@ export class OakApiService {
         }),
       });
 
-      const response = await streamAxios.get(
-        `/lessons/${lessonSlug}/assets/${assetType}`,
-        {
-          responseType: 'stream',
-          validateStatus: (status) => status < 500, // Allow 4xx to pass through
-        }
-      );
+      const response = await streamAxios.get(`/lessons/${lessonSlug}/assets/${assetType}`, {
+        responseType: 'stream',
+        validateStatus: (status) => status < 500, // Allow 4xx to pass through
+      });
 
       // Handle 404
       if (response.status === 404) {
@@ -795,9 +808,10 @@ export class OakApiService {
       }
 
       // Success - return the stream
-      const contentType = assetType === 'video'
-        ? 'video/mp4'
-        : (response.headers['content-type'] || 'application/octet-stream');
+      const contentType =
+        assetType === 'video'
+          ? 'video/mp4'
+          : response.headers['content-type'] || 'application/octet-stream';
 
       return {
         stream: response.data,
@@ -838,7 +852,11 @@ export class OakApiService {
       } catch (error: any) {
         // Handle 404 gracefully - some lessons don't have transcripts
         if (axios.isAxiosError(error) && error.response?.status === 404) {
-          return { transcript: null, vtt: null, message: 'No transcript available for this lesson' };
+          return {
+            transcript: null,
+            vtt: null,
+            message: 'No transcript available for this lesson',
+          };
         }
         return this.handleApiError(error);
       }
@@ -954,18 +972,23 @@ export default {
   },
   getKeyStages: () => getOakApiService().getKeyStages(),
   getSubjectsByKeyStage: (keyStage: string) => getOakApiService().getSubjectsByKeyStage(keyStage),
-  getUnits: (keyStage: string, subjectSlug: string) => getOakApiService().getUnits(keyStage, subjectSlug),
+  getUnits: (keyStage: string, subjectSlug: string) =>
+    getOakApiService().getUnits(keyStage, subjectSlug),
   getUnitDetails: (unitSlug: string) => getOakApiService().getUnitDetails(unitSlug),
   getLessons: (unitSlug: string) => getOakApiService().getLessons(unitSlug),
   getLessonDetails: (lessonSlug: string) => getOakApiService().getLessonDetails(lessonSlug),
   getLessonVideo: (lessonSlug: string) => getOakApiService().getLessonVideo(lessonSlug),
   getLessonQuiz: (lessonSlug: string) => getOakApiService().getLessonQuiz(lessonSlug),
-  getLessonAssets: (lessonSlug: string, backendBaseUrl?: string) => getOakApiService().getLessonAssets(lessonSlug, backendBaseUrl),
-  getAssetFile: (lessonSlug: string, assetType: string) => getOakApiService().getAssetFile(lessonSlug, assetType),
+  getLessonAssets: (lessonSlug: string, backendBaseUrl?: string) =>
+    getOakApiService().getLessonAssets(lessonSlug, backendBaseUrl),
+  getAssetFile: (lessonSlug: string, assetType: string) =>
+    getOakApiService().getAssetFile(lessonSlug, assetType),
   getLessonTranscript: (lessonSlug: string) => getOakApiService().getLessonTranscript(lessonSlug),
-  searchLessons: (query: string, filters?: SearchFilters) => getOakApiService().searchLessons(query, filters),
+  searchLessons: (query: string, filters?: SearchFilters) =>
+    getOakApiService().searchLessons(query, filters),
   clearCache: (pattern: string) => getOakApiService().clearCache(pattern),
-  clearSubjectCache: (keyStage: string, subjectSlug: string) => getOakApiService().clearSubjectCache(keyStage, subjectSlug),
+  clearSubjectCache: (keyStage: string, subjectSlug: string) =>
+    getOakApiService().clearSubjectCache(keyStage, subjectSlug),
   clearKeyStageCache: (keyStage: string) => getOakApiService().clearKeyStageCache(keyStage),
   getRateLimitStatus: () => getOakApiService().getRateLimitStatus(),
 };

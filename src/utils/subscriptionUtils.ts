@@ -5,7 +5,7 @@
 
 export interface SubscriptionInfo {
   plan: 'free' | 'premium';
-  status: 'free' | 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
+  status: 'free' | 'active' | 'cancelled' | 'trialing' | 'past_due';
   expiresAt?: Date;
   trialEndsAt?: Date;
 }
