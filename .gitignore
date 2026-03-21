@@ -142,3 +142,7 @@ vite.config.ts.timestamp-*
 .flaskenv*
 !.env.project
 !.env.vault
+
+# Debug reports and scripts
+src/scripts/debug
+*.txt

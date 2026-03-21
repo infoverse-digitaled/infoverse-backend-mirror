@@ -21,11 +21,11 @@ const activePlanCodes = PLAN_CODES[currentMode];
 export const PAYSTACK_PLANS = {
   INDIVIDUAL_MONTHLY: {
     code: activePlanCodes.INDIVIDUAL_MONTHLY,
-    amount: 500000, // ₦5,000
+    amount: 300000, // ₦3,000
   },
   INDIVIDUAL_ANNUAL: {
     code: activePlanCodes.INDIVIDUAL_ANNUAL,
-    amount: 4000000, // ₦40,000
+    amount: 2500000, // ₦25,000
   },
   FAMILY_ANNUAL: {
     code: activePlanCodes.FAMILY_ANNUAL,
@@ -40,15 +40,15 @@ export const getActivePlanCodes = () => ({
     {
       id: 'annual',
       name: 'Annual Plan',
-      price: '₦40,000',
-      description: 'Best value - save 33%',
+      price: '₦25,000',
+      description: 'Best value - save 30%',
       planCode: activePlanCodes.INDIVIDUAL_ANNUAL,
       recommended: true,
     },
     {
       id: 'monthly',
       name: 'Monthly Plan',
-      price: '₦5,000',
+      price: '₦3,000',
       description: 'Billed monthly',
       planCode: activePlanCodes.INDIVIDUAL_MONTHLY,
     },
