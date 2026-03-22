@@ -281,23 +281,6 @@ export const getPricing = async (_req: Request, res: Response) => {
           'Priority support',
         ],
       },
-      {
-        id: 'family_annual',
-        name: 'Family Annual',
-        code: PAYSTACK_PLANS.FAMILY_ANNUAL.code,
-        amount: PAYSTACK_PLANS.FAMILY_ANNUAL.amount,
-        currency: 'NGN',
-        interval: 'annual',
-        maxUsers: 5,
-        features: [
-          'Up to 5 family members',
-          'Access to all premium subjects',
-          'Unlimited lesson access',
-          'Progress tracking for each member',
-          'Ad-free experience',
-          'Priority support',
-        ],
-      },
     ];
 
     // Include payment configuration status for frontend

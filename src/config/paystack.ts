@@ -3,14 +3,12 @@ import config from './index';
 // Plan codes for different environments
 const PLAN_CODES = {
   test: {
-    INDIVIDUAL_MONTHLY: 'PLN_ycwo3qwzubzlv3v',
-    INDIVIDUAL_ANNUAL: 'PLN_o1rf7r0jl507aoq',
-    FAMILY_ANNUAL: '', // Add test family plan code if needed
+    INDIVIDUAL_MONTHLY: 'PLN_sgry7evrd03iw15',
+    INDIVIDUAL_ANNUAL: 'PLN_alwct8bj4ybmjqf',
   },
   live: {
-    INDIVIDUAL_MONTHLY: 'PLN_vnfkw3ejctr7fe4',
-    INDIVIDUAL_ANNUAL: 'PLN_t56h44wx8f2vcw7',
-    FAMILY_ANNUAL: 'PLN_8et2pw5d7mfg3j1',
+    INDIVIDUAL_MONTHLY: 'PLN_sgry7evrd03iw15',
+    INDIVIDUAL_ANNUAL: 'PLN_alwct8bj4ybmjqf',
   },
 };
 
@@ -26,10 +24,6 @@ export const PAYSTACK_PLANS = {
   INDIVIDUAL_ANNUAL: {
     code: activePlanCodes.INDIVIDUAL_ANNUAL,
     amount: 2500000, // ₦25,000
-  },
-  FAMILY_ANNUAL: {
-    code: activePlanCodes.FAMILY_ANNUAL,
-    amount: 11500000, // ₦115,000
   },
 };
 
