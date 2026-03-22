@@ -3,8 +3,8 @@ import config from './index';
 // Plan codes for different environments
 const PLAN_CODES = {
   test: {
-    INDIVIDUAL_MONTHLY: 'PLN_sgry7evrd03iw15',
-    INDIVIDUAL_ANNUAL: 'PLN_alwct8bj4ybmjqf',
+    INDIVIDUAL_MONTHLY: 'PLN_0xoqk4fd4ot3juu',
+    INDIVIDUAL_ANNUAL: 'PLN_cyhq1vhzf56cyfb',
   },
   live: {
     INDIVIDUAL_MONTHLY: 'PLN_sgry7evrd03iw15',
