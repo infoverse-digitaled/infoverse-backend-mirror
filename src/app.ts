@@ -21,8 +21,20 @@ const app = express();
 // Trust proxy for Render/production (required for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
 
-// Gzip compression for all responses. This should be very early.
-app.use(compression());
+// Gzip compression for all responses. 
+// We add a filter to skip compression for video/audio streams to prevent buffering issues.
+app.use(compression({
+  filter: (req, res) => {
+    const contentType = res.getHeader('Content-Type');
+    if (contentType && typeof contentType === 'string') {
+      if (contentType.startsWith('video/') || contentType.startsWith('audio/')) {
+        return false; // Don't compress video/audio (prevents buffering and "size too large" errors)
+      }
+    }
+    // Fallback to standard compression filter
+    return compression.filter(req, res);
+  }
+}));
 
 // Configure CORS to allow requests from the Next.js frontend URL.
 // Support multiple origins for development (localhost) and production (Netlify)
