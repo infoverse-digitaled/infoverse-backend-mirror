@@ -197,19 +197,26 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     // Set content type
     res.setHeader('Content-Type', contentType);
 
-    // Set content length if available
-    if (contentLength) {
+    // IMPORTANT FOR GCP: If we set a Content-Length > 32MB, GCP will kill the connection.
+   
+    if (contentLength && assetType !== 'video') {
       res.setHeader('Content-Length', contentLength);
     }
     
-    // Set content range if partial content
+    // For partial content (206), we MUST provide the content range
     if (contentRange) {
       res.setHeader('Content-Range', contentRange);
+      // For 206 responses, Content-Length is the size of the chunk, which is fine to set
+      if (contentLength && assetType === 'video') {
+        res.setHeader('Content-Length', contentLength);
+      }
     }
 
-    // For video, enable streaming and range requests
+    // Tell the browser and Load Balancer we support Range requests
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    // For video, enable streaming and security policies
     if (assetType === 'video') {
-      res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
       res.setHeader('Cache-Control', 'public, max-age=3600');
     } else if (contentDisposition) {
