@@ -174,29 +174,30 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     const oakApiKey = process.env.OAK_API_KEY;
     const oakBaseUrl = process.env.OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0';
 
-    // VIDEO assets are served directly from Oak's CDN (URL returned by /assets endpoint).
-    // They should never hit this proxy route. If they do, something is misconfigured.
-    if (assetType === 'video') {
-      return res.status(400).json({
-        error: 'Video assets are served directly from CDN. Use the URL from /assets endpoint.',
-      });
-    }
-
-    // ─── NON-VIDEO: Proxy through backend (PDFs, slides, etc. are small) ───
-    // CORS headers for the proxy response
+    // CORS headers
     const requestOrigin = req.headers.origin || 'https://infoversedigitaleducation.net';
     res.setHeader('Access-Control-Allow-Origin', requestOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    const range = req.headers.range;
+    // The browser's first video request has NO Range header.
+    // Without this, Node would try to stream the full 60MB+ video through GCP → killed at 32MB.
+    //
+    // Inject 'bytes=0-2097151' (2MB) if no Range header is present for video.
+    // Oak API responds with 206 + Content-Range: bytes 0-2097151/63428565.
+    // The browser reads the total file size from Content-Range, then makes proper
+    // Range requests for all subsequent chunks. Each chunk stays well under 32MB.
+    const rawRange = req.headers.range;
+    const range = (!rawRange && assetType === 'video') ? 'bytes=0-2097151' : rawRange;
+
     const { stream, contentType, contentDisposition, contentLength, contentRange, status } =
       await oakApiService.getAssetFile(lessonSlug, assetType, range);
 
     res.status(status || 200);
     res.setHeader('Content-Type', contentType);
 
+    // Always set Content-Length for video chunks (they're small — Oak API returns the chunk size)
     if (contentLength) res.setHeader('Content-Length', contentLength);
     if (contentRange) res.setHeader('Content-Range', contentRange);
     if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
