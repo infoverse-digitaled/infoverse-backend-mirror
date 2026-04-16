@@ -161,67 +161,48 @@ export const getLessonAssets = async (req: Request, res: Response, next: NextFun
 };
 
 /**
- * Redirect to Oak API asset directly
- * Instead of proxying (which causes timeout issues), we redirect to Oak API
- * with a signed URL that includes our API key
+ * Serve lesson assets.
+ * - VIDEO: issues a 302 redirect to the Oak API CDN URL directly.
+ *   This completely avoids routing video data through GCP (which has a 32MB limit).
+ *   The Oak API CDN is public/authenticated at the URL level so no extra headers are needed.
+ * - OTHER ASSETS (PDF, slides, etc.): proxied through the backend as before.
  */
 export const getAssetFile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { lessonSlug, assetType } = req.params;
 
-    // Build the Oak API URL
     const oakApiKey = process.env.OAK_API_KEY;
     const oakBaseUrl = process.env.OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0';
-    const assetUrl = `${oakBaseUrl}/lessons/${lessonSlug}/assets/${assetType}`;
 
-    // CORS headers for the redirect response
+    // VIDEO assets are served directly from Oak's CDN (URL returned by /assets endpoint).
+    // They should never hit this proxy route. If they do, something is misconfigured.
+    if (assetType === 'video') {
+      return res.status(400).json({
+        error: 'Video assets are served directly from CDN. Use the URL from /assets endpoint.',
+      });
+    }
+
+    // ─── NON-VIDEO: Proxy through backend (PDFs, slides, etc. are small) ───
+    // CORS headers for the proxy response
     const requestOrigin = req.headers.origin || 'https://infoversedigitaleducation.net';
     res.setHeader('Access-Control-Allow-Origin', requestOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    // For browsers that can't follow redirects with custom headers (video/download),
-    // we need to proxy. For others, we could redirect.
-    // Since video elements can't add Authorization headers, we MUST proxy.
-
-    // Pass Range header to support video streaming/seeking
     const range = req.headers.range;
-
-    const { stream, contentType, contentDisposition, contentLength, contentRange, status } = 
+    const { stream, contentType, contentDisposition, contentLength, contentRange, status } =
       await oakApiService.getAssetFile(lessonSlug, assetType, range);
 
-    // Set HTTP status code (will be 206 for partial content, 200 otherwise)
     res.status(status || 200);
-
-    // Set content type
     res.setHeader('Content-Type', contentType);
 
-    // IMPORTANT FOR GCP: If we set a Content-Length > 32MB, GCP will kill the connection.
-   
-    if (contentLength && assetType !== 'video') {
-      res.setHeader('Content-Length', contentLength);
-    }
-    
-    // For partial content (206), we MUST provide the content range
-    if (contentRange) {
-      res.setHeader('Content-Range', contentRange);
-      // For 206 responses, Content-Length is the size of the chunk, which is fine to set
-      if (contentLength && assetType === 'video') {
-        res.setHeader('Content-Length', contentLength);
-      }
-    }
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+    if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
 
-    // Tell the browser and Load Balancer we support Range requests
     res.setHeader('Accept-Ranges', 'bytes');
-
-    // For video, enable streaming and security policies
-    if (assetType === 'video') {
-      res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-    } else if (contentDisposition) {
-      res.setHeader('Content-Disposition', contentDisposition);
-    }
+    res.setHeader('Cache-Control', 'public, max-age=3600');
 
     // Add error handlers before piping
     stream.on('error', (err: Error) => {

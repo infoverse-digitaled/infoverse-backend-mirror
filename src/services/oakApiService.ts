@@ -727,13 +727,23 @@ export class OakApiService {
         const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/assets`);
         const { data } = response;
 
-        // Rewrite Oak API URLs to use our backend proxy
+        // For VIDEO assets: return the original Oak CDN URL directly.
+        // The CDN URL is publicly accessible (no auth headers needed).
+        // This avoids routing large video through GCP which has a 32MB limit.
+        //
+        // For all OTHER assets (PDF, slides, etc.): rewrite to our backend proxy URL.
+        // These are small files that are fine to proxy.
         if (data.assets && Array.isArray(data.assets)) {
-          data.assets = data.assets.map((asset: any) => ({
-            ...asset,
-            // Replace Oak API URL with our backend proxy URL
-            url: `${backendBaseUrl}/api/v1/oak/lessons/${lessonSlug}/assets/${asset.type}`,
-          }));
+          data.assets = data.assets.map((asset: any) => {
+            if (asset.type === 'video') {
+              // Keep the original Oak CDN URL — browser streams direct from CDN
+              return asset;
+            }
+            return {
+              ...asset,
+              url: `${backendBaseUrl}/api/v1/oak/lessons/${lessonSlug}/assets/${asset.type}`,
+            };
+          });
         }
 
         return data;
