@@ -185,7 +185,14 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     // we need to proxy. For others, we could redirect.
     // Since video elements can't add Authorization headers, we MUST proxy.
 
-    const { stream, contentType, contentDisposition, contentLength } = await oakApiService.getAssetFile(lessonSlug, assetType);
+    // Pass Range header to support video streaming/seeking
+    const range = req.headers.range;
+
+    const { stream, contentType, contentDisposition, contentLength, contentRange, status } = 
+      await oakApiService.getAssetFile(lessonSlug, assetType, range);
+
+    // Set HTTP status code (will be 206 for partial content, 200 otherwise)
+    res.status(status || 200);
 
     // Set content type
     res.setHeader('Content-Type', contentType);
@@ -193,6 +200,11 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     // Set content length if available
     if (contentLength) {
       res.setHeader('Content-Length', contentLength);
+    }
+    
+    // Set content range if partial content
+    if (contentRange) {
+      res.setHeader('Content-Range', contentRange);
     }
 
     // For video, enable streaming and range requests

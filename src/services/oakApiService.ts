@@ -756,11 +756,14 @@ export class OakApiService {
   async getAssetFile(
     lessonSlug: string,
     assetType: string,
+    range?: string,
   ): Promise<{
     stream: any;
     contentType: string;
     contentDisposition?: string;
     contentLength?: string;
+    contentRange?: string;
+    status: number;
   }> {
     this.checkRateLimit();
 
@@ -771,6 +774,7 @@ export class OakApiService {
         baseURL: config.oak.apiBaseUrl,
         headers: {
           ...(config.oak.apiKey && { Authorization: `Bearer ${config.oak.apiKey}` }),
+          ...(range && { Range: range }),
           Accept: '*/*',
           'User-Agent': 'Infoverse-Backend/1.0',
         },
@@ -818,6 +822,8 @@ export class OakApiService {
         contentType,
         contentDisposition: response.headers['content-disposition'],
         contentLength: response.headers['content-length'],
+        contentRange: response.headers['content-range'],
+        status: response.status,
       };
     } catch (error: any) {
       // Handle 404 specifically
@@ -981,8 +987,8 @@ export default {
   getLessonQuiz: (lessonSlug: string) => getOakApiService().getLessonQuiz(lessonSlug),
   getLessonAssets: (lessonSlug: string, backendBaseUrl?: string) =>
     getOakApiService().getLessonAssets(lessonSlug, backendBaseUrl),
-  getAssetFile: (lessonSlug: string, assetType: string) =>
-    getOakApiService().getAssetFile(lessonSlug, assetType),
+  getAssetFile: (lessonSlug: string, assetType: string, range?: string) =>
+    getOakApiService().getAssetFile(lessonSlug, assetType, range),
   getLessonTranscript: (lessonSlug: string) => getOakApiService().getLessonTranscript(lessonSlug),
   searchLessons: (query: string, filters?: SearchFilters) =>
     getOakApiService().searchLessons(query, filters),
