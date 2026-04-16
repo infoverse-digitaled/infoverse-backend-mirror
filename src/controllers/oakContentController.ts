@@ -180,21 +180,24 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    // GCP FIX: Cap large video requests to 2MB chunks so they never exceed GCP's 32MB limit.
+    // GCP FIX: Cap all video range requests so no single response exceeds 8MB.
+    // GCP Cloud Run kills responses > 32MB. Videos are 60-100MB+.
     //
-    // Chrome sends 'Range: bytes=0-' (open-ended) as its very first video request,
-    // meaning "give me the whole file from byte 0." Oak API obliges and returns the full
-    // 60-96MB file, which GCP kills. We intercept both cases:
-    //   - No Range header at all  → inject 'bytes=0-2097151'
-    //   - 'bytes=0-' (open-ended) → cap to   'bytes=0-2097151'
-    // For all subsequent browser range requests (specific start/end), we pass them through
-    // unchanged — they're already small chunks well under 32MB.
+    // Browsers send open-ended ranges like 'bytes=0-' or 'bytes=8388608-'
+    // meaning "give me everything from byte X onwards" — Oak API obliges with the full
+    // remaining file which blows through the 32MB cap. We intercept all open-ended
+    // ranges and cap them to 8MB chunks (safe buffer below 32MB, ~45-60s of video).
+    // Specific ranges (e.g. 'bytes=4000000-5000000') pass through unchanged.
     const rawRange = req.headers.range;
     let range: string | undefined = rawRange;
     if (assetType === 'video') {
-      if (!rawRange || rawRange === 'bytes=0-') {
-        range = 'bytes=0-2097151'; // cap to first 2MB
+      const openEnded = rawRange?.match(/^bytes=(\d+)-$/); // e.g. 'bytes=0-' or 'bytes=8388608-'
+      if (!rawRange || openEnded) {
+        const start = openEnded ? parseInt(openEnded[1], 10) : 0;
+        const end = start + 8388607; // 8MB chunk (8 * 1024 * 1024 - 1)
+        range = `bytes=${start}-${end}`;
       }
+      // else: specific range (bytes=X-Y) — pass through as-is
     }
 
     const { stream, contentType, contentDisposition, contentLength, contentRange, status } =
