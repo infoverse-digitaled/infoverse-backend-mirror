@@ -180,16 +180,22 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-
-    // The browser's first video request has NO Range header.
-    // Without this, Node would try to stream the full 60MB+ video through GCP → killed at 32MB.
+    // GCP FIX: Cap large video requests to 2MB chunks so they never exceed GCP's 32MB limit.
     //
-    // Inject 'bytes=0-2097151' (2MB) if no Range header is present for video.
-    // Oak API responds with 206 + Content-Range: bytes 0-2097151/63428565.
-    // The browser reads the total file size from Content-Range, then makes proper
-    // Range requests for all subsequent chunks. Each chunk stays well under 32MB.
+    // Chrome sends 'Range: bytes=0-' (open-ended) as its very first video request,
+    // meaning "give me the whole file from byte 0." Oak API obliges and returns the full
+    // 60-96MB file, which GCP kills. We intercept both cases:
+    //   - No Range header at all  → inject 'bytes=0-2097151'
+    //   - 'bytes=0-' (open-ended) → cap to   'bytes=0-2097151'
+    // For all subsequent browser range requests (specific start/end), we pass them through
+    // unchanged — they're already small chunks well under 32MB.
     const rawRange = req.headers.range;
-    const range = (!rawRange && assetType === 'video') ? 'bytes=0-2097151' : rawRange;
+    let range: string | undefined = rawRange;
+    if (assetType === 'video') {
+      if (!rawRange || rawRange === 'bytes=0-') {
+        range = 'bytes=0-2097151'; // cap to first 2MB
+      }
+    }
 
     const { stream, contentType, contentDisposition, contentLength, contentRange, status } =
       await oakApiService.getAssetFile(lessonSlug, assetType, range);
