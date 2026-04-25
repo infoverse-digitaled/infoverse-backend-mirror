@@ -35,23 +35,28 @@ export const initializeCardValidation = async (email: string, planCode: string) 
  */
 export const initializePayment = async (
   email: string,
-  planCode: string,
+  planCode: string | null,
   amount: number,
   callbackUrl: string
 ) => {
   try {
+    const payload: any = {
+      email,
+      amount, // Amount in kobo
+      callback_url: callbackUrl,
+      metadata: {
+        planCode,
+        paymentType: planCode ? 'direct' : 'one-time', 
+      },
+    };
+
+    if (planCode) {
+      payload.plan = planCode;
+    }
+
     const response = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
-      {
-        email,
-        amount, // Amount in kobo
-        plan: planCode,
-        callback_url: callbackUrl,
-        metadata: {
-          planCode,
-          paymentType: 'direct', // Flag to distinguish from trial
-        },
-      },
+      payload,
       {
         headers: getHeaders(),
       }

@@ -5,9 +5,9 @@ export interface IUser extends Document {
   email: string;
   passwordHash?: string; // Optional for OAuth users
   name: string;
-  role: 'student' | 'instructor';
+  role: 'student' | 'instructor' | 'admin' | 'schooladmin';
   subscription: {
-    plan: 'free' | 'premium';
+    plan: string;
     status: 'free' | 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
     expiresAt?: Date;
     trialEndsAt?: Date;
@@ -15,6 +15,9 @@ export interface IUser extends Document {
   // B2B License fields
   licenseKey?: string;
   organizationName?: string;
+  // School Admin fields
+  schoolCode?: string;
+  schoolName?: string;
   keyStage?: 'ks1' | 'ks2' | 'ks3' | 'ks4';
   yearGroup?: number;
   preferences: {

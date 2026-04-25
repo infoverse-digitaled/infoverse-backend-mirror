@@ -177,3 +177,28 @@ export const optionalAuth: RequestHandler = async (req, res, next) => {
     next();
   }
 };
+
+/**
+ * Middleware to check if user has required role(s)
+ */
+export const checkRole = (...roles: string[]): RequestHandler => {
+  return (req, res, next) => {
+    const userRole = (req as AuthenticatedRequest).user?.role;
+    
+    if (!userRole) {
+      res.status(401).json({
+        error: { code: 'UNAUTHORIZED', message: 'User role not found' },
+      });
+      return;
+    }
+
+    if (!roles.includes(userRole)) {
+      res.status(403).json({
+        error: { code: 'FORBIDDEN', message: 'You do not have permission to perform this action' },
+      });
+      return;
+    }
+
+    next();
+  };
+};

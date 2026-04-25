@@ -40,27 +40,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       if (!existingUser.passwordHash) {
         throw new HttpError(401, 'OAUTH_USER', 'This account uses Google sign-in. Please continue with Google.');
       }
-
-      // Verify password and log them in (unified auth)
-      const isMatch = await bcrypt.compare(password, existingUser.passwordHash);
-      if (!isMatch) {
-        throw new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
-      }
-
-      // Generate token for existing user
-      const secret = new TextEncoder().encode(config.jwt.secret);
-      const token = await new SignJWT({ userId: String(existingUser._id), role: existingUser.role })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setExpirationTime(config.jwt.expiresIn)
-        .sign(secret);
-
-      console.log(`[Auth] Existing user logged in via signup: ${email}`);
-
-      return successResponse(res, {
-        ...existingUser.toObject(),
-        token,
-        skipPayment: !!existingUser.subscription && existingUser.subscription.status !== 'free',
-      }, 'Login successful', 200);
+      
+      throw new HttpError(400, 'USER_EXISTS', 'A user with this email already exists. Please log in instead.');
     }
 
     // Hash the user's password with a salt round of 10 for security.
@@ -82,38 +63,64 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     // Handle B2B license registration
     if (licenseKey) {
-      const license = await LicenseBatch.findOne({
-        licenseKey: licenseKey.toUpperCase().trim()
+      // Normalize: remove dashes, spaces, and make uppercase
+      const normalizedKey = licenseKey.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      
+      // 1. Try to find an official LicenseBatch
+      let license = await LicenseBatch.findOne({
+        licenseKey: { $regex: new RegExp(`^${normalizedKey.split('').join('[- ]*')}$`, 'i') }
       });
 
-      if (!license) {
-        throw new HttpError(400, 'INVALID_LICENSE', 'Invalid license code.');
-      }
+      if (license) {
+        // Validation for official batches
+        if (!license.isActive) {
+          throw new HttpError(400, 'LICENSE_INACTIVE', 'This license is no longer active.');
+        }
 
-      if (!license.isActive) {
-        throw new HttpError(400, 'LICENSE_INACTIVE', 'This license is no longer active.');
-      }
+        if (new Date(license.expiryDate) <= new Date()) {
+          throw new HttpError(400, 'LICENSE_EXPIRED', 'This license has expired.');
+        }
 
-      if (new Date(license.expiryDate) <= new Date()) {
-        throw new HttpError(400, 'LICENSE_EXPIRED', 'This license has expired.');
-      }
+        if (license.enrolledCount >= license.maxUsers) {
+          throw new HttpError(400, 'LICENSE_FULL', 'This license has reached its maximum user limit.');
+        }
 
-      if (license.enrolledCount >= license.maxUsers) {
-        throw new HttpError(400, 'LICENSE_FULL', 'This license has reached its maximum user limit.');
-      }
+        // Increment count
+        license.enrolledCount += 1;
+        await license.save();
+        
+        userLicenseKey = license.licenseKey;
+        organizationName = license.schoolName;
+      } else {
+        // 2. Fallback: Check if a School Admin has this code (for trials/unpurchased tiers)
+        // Note: Students are often the first to join a trial begun by an admin
+        const schoolAdmin = await User.findOne({
+          role: 'schooladmin',
+          schoolCode: { $regex: new RegExp(`^${normalizedKey.split('').join('[- ]*')}$`, 'i') }
+        });
 
-      // Increment enrolled count
-      license.enrolledCount += 1;
-      await license.save();
+        if (!schoolAdmin) {
+          throw new HttpError(400, 'INVALID_LICENSE', 'Invalid license code.');
+        }
+
+        // Check if the school admin's account is actually in good standing
+        const adminSubscription = schoolAdmin.subscription?.status;
+        const isAdminActive = adminSubscription === 'active' || 
+                             (adminSubscription === 'trialing' && schoolAdmin.subscription?.trialEndsAt && new Date(schoolAdmin.subscription.trialEndsAt) > new Date());
+
+        if (!isAdminActive) {
+          throw new HttpError(400, 'LICENSE_INACTIVE', 'The school associated with this code does not have an active subscription.');
+        }
+
+        userLicenseKey = schoolAdmin.schoolCode;
+        organizationName = schoolAdmin.schoolName || schoolAdmin.organizationName;
+      }
 
       // Set premium subscription without trial (bypasses payment)
       subscriptionData = {
         status: 'active',
         plan: 'premium',
       };
-
-      userLicenseKey = license.licenseKey;
-      organizationName = license.schoolName;
     }
 
     // Create the new user in the database
@@ -122,13 +129,36 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       email,
       passwordHash,
       subscription: subscriptionData,
-      licenseKey: userLicenseKey,
+      licenseKey: userLicenseKey, // For student/B2B access logic
+      schoolCode: userLicenseKey, // Also save to schoolCode for compatibility
       organizationName,
+    });
+
+    // Create a JSON Web Token for the new user for auto-login
+    const secret = new TextEncoder().encode(config.jwt.secret);
+    const token = await new SignJWT({ userId: String(newUser._id), role: newUser.role })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime(config.jwt.expiresIn)
+      .sign(secret);
+
+    // Set the JWT as a secure, HTTP-only cookie.
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds.
     });
 
     // Include a flag to indicate if payment should be skipped
     const responseData = {
-      ...newUser.toObject(),
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        subscription: newUser.subscription,
+      },
+      token,
       skipPayment: !!licenseKey, // Frontend uses this to redirect directly to dashboard
     };
 
@@ -330,12 +360,27 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
       throw new HttpError(404, 'USER_NOT_FOUND', 'User not found.');
     }
 
-    // Check if trial has expired and update status if needed
+    // 1. Check if trial has expired and update status if needed
     if (user.subscription?.status === 'trialing' && user.subscription.trialEndsAt) {
       if (new Date(user.subscription.trialEndsAt) <= new Date()) {
         user.subscription.status = 'free';
         user.subscription.plan = 'free';
         await user.save();
+      }
+    }
+
+    // 2. Check if school license has expired (Dynamic check)
+    if (user.subscription?.status === 'active' && user.licenseKey) {
+      const license = await LicenseBatch.findOne({ licenseKey: user.licenseKey });
+      
+      const isExpired = !license || !license.isActive || new Date(license.expiryDate) <= new Date();
+      
+      if (isExpired) {
+        // Downgrade user because school access is no longer valid
+        user.subscription.status = 'free';
+        user.subscription.plan = 'free';
+        await user.save();
+        console.log(`[Auth] User ${user.email} downgraded due to expired school license: ${user.licenseKey}`);
       }
     }
 

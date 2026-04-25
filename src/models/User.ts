@@ -76,14 +76,13 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['student', 'instructor', 'admin'],
+      enum: ['student', 'instructor', 'admin', 'schooladmin'],
       default: 'student',
       required: true,
     },
     subscription: {
       plan: {
         type: String,
-        enum: ['free', 'premium'],
         default: 'free',
       },
       status: {
@@ -105,6 +104,17 @@ const UserSchema = new Schema<IUser>(
       index: true,
     },
     organizationName: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    // School Admin fields
+    schoolCode: {
+      type: String,
+      required: false,
+      index: true,
+    },
+    schoolName: {
       type: String,
       required: false,
       trim: true,

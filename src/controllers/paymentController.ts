@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as paystackService from '../services/paystackService';
 import User from '../models/User';
+import LicenseBatch from '../models/LicenseBatch';
 import { PAYSTACK_PLANS, getActivePlanCodes } from '../config/paystack';
 import { successResponse } from '../middleware/response';
 import config from '../config';
@@ -31,9 +32,9 @@ export const startTrial = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Check if user already has an active subscription
-    if (user.subscription?.status === 'active') {
-      return res.status(400).json({ error: 'You already have an active subscription' });
+    // Check if user already has an active PAID subscription
+    if (user.subscription?.status === 'active' && user.subscription?.plan !== 'free') {
+      return res.status(400).json({ error: 'You already have an active paid subscription' });
     }
 
     // Check if user is already trialing
@@ -49,21 +50,28 @@ export const startTrial = async (req: Request, res: Response) => {
 
     // Validate planCode (optional - store for when they convert)
     if (planCode) {
-      const isValidPlan = Object.values(PAYSTACK_PLANS).some((p) => p.code === planCode);
+      const isValidPlan = Object.values(PAYSTACK_PLANS).some((p) => (p as any).code === planCode);
       if (!isValidPlan) {
         return res.status(400).json({ error: 'Invalid plan code' });
       }
     }
 
-    // Calculate trial end date (configurable, default 7 days)
-    const trialDays = config.payment.trialDays;
+    // Find plan from code to get its descriptive name
+    let planName = 'premium';
+    const planEntry = Object.entries(PAYSTACK_PLANS).find(([_, p]) => (p as any).code === planCode);
+    if (planEntry) {
+      planName = planEntry[0].toLowerCase(); // e.g., 'school_small'
+    }
+
+    // Calculate trial end date (configurable, default 1 month for schools as requested)
+    const trialDays = planName.includes('school') ? 30 : config.payment.trialDays;
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
     // Update user with trial subscription
     await User.findByIdAndUpdate(user.id, {
       'subscription.status': 'trialing',
-      'subscription.plan': 'premium',
+      'subscription.plan': planName,
       'subscription.trialEndsAt': trialEndsAt,
     });
 
@@ -96,7 +104,7 @@ export const startTrialWithCard = async (req: Request, res: Response) => {
     }
 
     // Validate planCode
-    const isValidPlan = Object.values(PAYSTACK_PLANS).some((p) => p.code === planCode);
+    const isValidPlan = Object.values(PAYSTACK_PLANS).some((p) => (p as any).code === planCode);
     if (!isValidPlan) {
       return res.status(400).json({ error: 'Invalid plan code' });
     }
@@ -124,12 +132,21 @@ export const verifyTrial = async (req: Request, res: Response) => {
     }
 
     const subscriptionData = await paystackService.verifyAndCreateTrial(reference);
+    const planCode = subscriptionData.data.plan;
+
+    // Find plan name
+    let planName = 'premium';
+    const planEntry = Object.entries(PAYSTACK_PLANS).find(([_, p]) => (p as any).code === planCode);
+    if (planEntry) {
+      planName = planEntry[0].toLowerCase();
+    }
 
     // Update User to active status (Upgrade complete)
     await User.findByIdAndUpdate(user.id, {
       'subscription.status': 'active',
-      'subscription.plan': 'premium',
-      // We don't set trialEndsAt because the trial is over/converted
+      'subscription.plan': planName,
+      // Clear trial
+      'subscription.trialEndsAt': null,
     });
 
     res.status(200).json({
@@ -143,7 +160,9 @@ export const verifyTrial = async (req: Request, res: Response) => {
 };
 
 /**
- * Verify a direct payment (subscription auto-created by Paystack)
+ * Verify a direct payment.
+ * - One-time term purchases: extends the school's LicenseBatch expiryDate by 12 weeks.
+ * - Recurring plan purchases: activates the User's subscription.
  */
 export const verifyPayment = async (req: Request, res: Response) => {
   try {
@@ -158,24 +177,64 @@ export const verifyPayment = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Payment reference is required' });
     }
 
-    // Just verify the transaction - subscription is already created by Paystack
     const verificationResult = await paystackService.verifyPayment(reference);
 
     if (!verificationResult.success) {
       return res.status(400).json({ error: 'Payment verification failed' });
     }
 
-    // Update User to active status
-    await User.findByIdAndUpdate(user.id, {
-      'subscription.status': 'active',
-      'subscription.plan': 'premium',
-      'subscription.trialEndsAt': null, // Clear trial end date
-    });
+    const paymentType = verificationResult.data.metadata?.paymentType;
 
-    res.status(200).json({
-      message: 'Payment verified successfully! Your subscription is now active.',
-      success: true,
-    });
+    if (paymentType === 'one-time') {
+      // --- School Term (one-time) flow ---
+      // Find the school's LicenseBatch via the admin's schoolCode or licenseKey
+      const schoolCode = user.schoolCode || user.licenseKey;
+      if (!schoolCode) {
+        return res.status(400).json({ error: 'No school code or license key associated with this account' });
+      }
+
+      const batch = await LicenseBatch.findOne({ licenseKey: schoolCode });
+      if (!batch) {
+        return res.status(404).json({ error: 'License batch not found for this school' });
+      }
+
+      // Extend from today (or from current expiry if still active in the future)
+      const TERM_WEEKS = 12;
+      const baseDate = batch.expiryDate > new Date() ? batch.expiryDate : new Date();
+      const newExpiry = new Date(baseDate);
+      newExpiry.setDate(newExpiry.getDate() + TERM_WEEKS * 7);
+
+      await LicenseBatch.findByIdAndUpdate(batch._id, {
+        expiryDate: newExpiry,
+        isActive: true,
+      });
+
+      return res.status(200).json({
+        message: `School term access extended by ${TERM_WEEKS} weeks. Access valid until ${newExpiry.toDateString()}.`,
+        success: true,
+        expiryDate: newExpiry.toISOString(),
+        weeksGranted: TERM_WEEKS,
+      });
+    } else {
+      // --- Recurring subscription (plan) flow ---
+      const planCode = verificationResult.data.plan;
+      let planName = 'premium';
+      const planEntry = Object.entries(PAYSTACK_PLANS).find(([_, p]) => (p as any).code === planCode);
+      if (planEntry) {
+        planName = planEntry[0].toLowerCase();
+      }
+
+      await User.findByIdAndUpdate(user.id, {
+        'subscription.status': 'active',
+        'subscription.plan': planName,
+        'subscription.trialEndsAt': null,
+      });
+
+      return res.status(200).json({
+        message: 'Payment verified successfully! Your subscription is now active.',
+        success: true,
+      });
+    }
   } catch (error: any) {
     console.error('Verify Payment Error:', error);
     res.status(500).json({ error: error.message || 'Failed to verify payment' });
@@ -184,6 +243,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
 /**
  * Initialize direct payment (skip trial, pay with card immediately)
+ * Handles both recurring plans (school year / individual) and one-time term purchases.
  */
 export const initializePayment = async (req: Request, res: Response) => {
   try {
@@ -197,33 +257,51 @@ export const initializePayment = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Direct payment is currently disabled. Please start with a free trial.' });
     }
 
-    const { planCode } = req.body;
+    // Accept either a Paystack planCode (for recurring) or a tierId (for one-time term)
+    const { planCode, tierId } = req.body;
     const user = (req as any).user;
 
     if (!user || !user.email) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Validate planCode and get amount
     let planAmount: number | null = null;
-    for (const plan of Object.values(PAYSTACK_PLANS)) {
-      if (plan.code === planCode) {
-        planAmount = plan.amount;
-        break;
+    let resolvedPlanCode: string | null = null;
+
+    if (tierId) {
+      // One-time term purchase — look up by tier ID key (e.g. 'SCHOOL_TIER1_TERM')
+      const tierKey = tierId.toUpperCase() as keyof typeof PAYSTACK_PLANS;
+      const tier = PAYSTACK_PLANS[tierKey] as any;
+
+      if (!tier || tier.type !== 'one-time') {
+        return res.status(400).json({ error: 'Invalid tier ID for one-time purchase' });
       }
+
+      planAmount = tier.amount;
+      resolvedPlanCode = null; // No Paystack plan for term payments
+    } else if (planCode) {
+      // Recurring subscription — find by plan code
+      for (const [, plan] of Object.entries(PAYSTACK_PLANS)) {
+        if ((plan as any).code === planCode) {
+          planAmount = plan.amount;
+          resolvedPlanCode = planCode;
+          break;
+        }
+      }
+
+      if (!planAmount) {
+        return res.status(400).json({ error: 'Invalid plan code' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Either planCode or tierId is required' });
     }
 
-    if (!planAmount) {
-      return res.status(400).json({ error: 'Invalid plan code' });
-    }
-
-    // Get callback URL from environment or use default
     const callbackUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/callback`;
 
     const initializationData = await paystackService.initializePayment(
       user.email,
-      planCode,
-      planAmount,
+      resolvedPlanCode,
+      planAmount!,
       callbackUrl
     );
 

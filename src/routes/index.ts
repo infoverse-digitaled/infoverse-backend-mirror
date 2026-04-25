@@ -13,6 +13,7 @@ import paymentRouter from './payment';
 import contentRouter from './contentRoutes';
 import aiRouter from './aiRoutes';
 import publicRouter from './publicRoutes';
+import schoolRouter from './schoolRoutes';
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use('/payment', paymentRouter);
 router.use('/content', contentRouter);
 router.use('/ai', aiRouter);
 router.use('/public', publicRouter);
+router.use('/school', schoolRouter);
 
 export default router;

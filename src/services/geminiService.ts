@@ -22,6 +22,37 @@ const RATE_LIMIT = 10; // requests per minute
 const RATE_WINDOW = 60 * 1000; // 1 minute in ms
 
 /**
+ retry Gemini requests with exponential backoff
+ */
+const executeWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 2000
+): Promise<T> => {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      attempt++;
+      
+      // We only want to retry on specific transient errors (429 Rate Limit, 503 Unavaiable)
+      // If error is something else, or we're on the last attempt, immediately throw
+      if (attempt >= maxRetries || (error.status && error.status !== 429 && error.status !== 500 && error.status !== 503)) {
+        throw error;
+      }
+      
+      // Calculate delay: baseDelay * 2^(attempt - 1)
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      logger.warn(`[Gemini] API request failed. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error("Exponential backoff failed");
+};
+
+/**
  * Check if user has exceeded rate limit
  */
 export const checkRateLimit = (userId: string): boolean => {
@@ -78,7 +109,7 @@ INSTRUCTIONS:
 
 Please answer the student's question:`;
 
-    const result = await model.generateContent(prompt);
+    const result = await executeWithBackoff(() => model.generateContent(prompt));
     const response = await result.response;
     const text = response.text();
 
@@ -136,7 +167,7 @@ INSTRUCTIONS:
 
 Generate a summary:`;
 
-    const result = await model.generateContent(prompt);
+    const result = await executeWithBackoff(() => model.generateContent(prompt));
     const response = await result.response;
     const text = response.text();
 
@@ -188,7 +219,7 @@ INSTRUCTIONS:
 
 Explain the concept:`;
 
-    const result = await model.generateContent(prompt);
+    const result = await executeWithBackoff(() => model.generateContent(prompt));
     const response = await result.response;
     const text = response.text();
 
