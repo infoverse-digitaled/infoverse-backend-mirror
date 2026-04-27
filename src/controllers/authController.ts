@@ -228,7 +228,17 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const data = {
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role,
+        subscription: user.subscription,
+        schoolCode: user.schoolCode,
+        schoolName: user.schoolName,
+        licenseKey: user.licenseKey,
+        keyStage: user.keyStage
+      },
     };
     successResponse(res, data, 'Login successful');
   } catch (err) {
