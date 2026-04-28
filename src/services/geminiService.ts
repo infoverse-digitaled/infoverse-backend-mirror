@@ -88,7 +88,7 @@ export const askTutor = async (
 
   try {
     const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `You are a helpful AI tutor for UK National Curriculum students.
 Your role is to help students understand their lessons better.
