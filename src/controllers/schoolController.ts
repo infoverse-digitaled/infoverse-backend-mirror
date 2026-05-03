@@ -45,7 +45,7 @@ export const registerSchoolAdmin = async (req: Request, res: Response, next: Nex
       subscription: {
         status: 'trialing',
         plan: 'premium',
-        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-day trial for schools
+        trialEndsAt: new Date(Date.now() + config.payment.schoolTrialDays * 24 * 60 * 60 * 1000), // Configurable trial for schools
       },
     });
 
@@ -54,7 +54,7 @@ export const registerSchoolAdmin = async (req: Request, res: Response, next: Nex
       schoolName,
       licenseKey: schoolCode,
       maxUsers: 100, // Default trial capacity
-      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiryDate: new Date(Date.now() + config.payment.schoolTrialDays * 24 * 60 * 60 * 1000),
       isActive: true,
     });
 

@@ -39,6 +39,14 @@ interface AppConfig {
     enableFreeTrial: boolean;
     enableDirectPayment: boolean;
     trialDays: number;
+    schoolTrialDays: number;
+  };
+  mail: {
+    host: string;
+    port: number;
+    user: string;
+    pass: string;
+    from: string;
   };
 }
 
@@ -73,6 +81,12 @@ const validateConfig = (): AppConfig => {
     ENABLE_FREE_TRIAL,
     ENABLE_DIRECT_PAYMENT,
     TRIAL_DAYS,
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_USER,
+    SMTP_PASS,
+    EMAIL_FROM,
+    SCHOOL_TRIAL_DAYS,
   } = process.env;
 
   // --- Validation for required variables ---
@@ -162,6 +176,14 @@ const validateConfig = (): AppConfig => {
       enableFreeTrial: ENABLE_FREE_TRIAL !== 'false',
       enableDirectPayment: ENABLE_DIRECT_PAYMENT !== 'false',
       trialDays: TRIAL_DAYS ? parseInt(TRIAL_DAYS, 10) : 7,
+      schoolTrialDays: SCHOOL_TRIAL_DAYS ? parseInt(SCHOOL_TRIAL_DAYS, 10) : 14,
+    },
+    mail: {
+      host: SMTP_HOST || 'smtp.zoho.com',
+      port: SMTP_PORT ? parseInt(SMTP_PORT, 10) : 465,
+      user: SMTP_USER || '',
+      pass: SMTP_PASS || '',
+      from: EMAIL_FROM || 'support@infoversedigitaleducation.net',
     },
   };
 };
