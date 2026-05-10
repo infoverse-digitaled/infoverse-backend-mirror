@@ -11,7 +11,7 @@ import { emailQueue } from '../utils/emailQueue';
 import { isTrialExpired, getSubscriptionTier } from '../utils/subscriptionUtils';
 import { OAuth2Client } from 'google-auth-library';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
 
 // Extend Request to include user info from auth middleware
 interface AuthenticatedRequest extends Request {
