@@ -262,7 +262,7 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
 
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_OAUTH_CLIENT_ID,
     });
     
     const payload = ticket.getPayload();
