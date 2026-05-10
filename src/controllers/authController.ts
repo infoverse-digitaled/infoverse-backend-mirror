@@ -9,6 +9,9 @@ import config from '../config';
 import { successResponse } from '../middleware/response';
 import { emailQueue } from '../utils/emailQueue';
 import { isTrialExpired, getSubscriptionTier } from '../utils/subscriptionUtils';
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Extend Request to include user info from auth middleware
 interface AuthenticatedRequest extends Request {
@@ -241,6 +244,81 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       },
     };
     successResponse(res, data, 'Login successful');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Handles Google OAuth login and registration.
+ */
+export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { credential } = req.body;
+    
+    if (!credential) {
+      throw new HttpError(400, 'MISSING_CREDENTIAL', 'Google credential is required.');
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      throw new HttpError(401, 'INVALID_TOKEN', 'Invalid Google token.');
+    }
+
+    const { email, name, given_name } = payload;
+    
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Auto-create account for new users via Google
+      user = await User.create({
+        name: name || given_name || email.split('@')[0],
+        email,
+        // passwordHash is omitted because they use OAuth
+        subscription: {
+          status: 'trialing',
+          plan: 'premium',
+          trialEndsAt: new Date(Date.now() + config.payment.trialDays * 24 * 60 * 60 * 1000),
+        },
+      });
+      console.log(`[Auth] Auto-created Google account for: ${email}`);
+    }
+
+    // Create JWT
+    const secret = new TextEncoder().encode(config.jwt.secret);
+    const token = await new SignJWT({ userId: String(user._id), role: user.role })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime(config.jwt.expiresIn)
+      .sign(secret);
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: config.env === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const data = {
+      token,
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role,
+        subscription: user.subscription,
+        schoolCode: user.schoolCode,
+        schoolName: user.schoolName,
+        licenseKey: user.licenseKey,
+        keyStage: user.keyStage
+      },
+    };
+    
+    successResponse(res, data, 'Google login successful');
   } catch (err) {
     next(err);
   }

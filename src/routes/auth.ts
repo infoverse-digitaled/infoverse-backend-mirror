@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { register, login, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
+import { register, login, googleLogin, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
 import {
   loginValidationRules,
   signupValidationRules,
@@ -76,6 +76,28 @@ router.post('/register', authLimiter, signupValidationRules, validateRequest, re
  *         description: Invalid credentials
  */
 router.post('/login', authLimiter, loginValidationRules, validateRequest, login);
+
+/**
+ * @swagger
+ * /api/v1/auth/google:
+ *   post:
+ *     summary: Login or register a user via Google OAuth
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             credential: google_jwt_token_here
+ *     responses:
+ *       200:
+ *         description: Login successful, returns JWT token
+ *       400:
+ *         description: Missing credential
+ *       401:
+ *         description: Invalid Google token
+ */
+router.post('/google', authLimiter, googleLogin);
 
 /**
  * @swagger
