@@ -192,3 +192,41 @@ export const getEnrollmentStatus = async (req: AuthenticatedRequest, res: Respon
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
   }
 };
+
+/**
+ * Admin: Get all enrollments for a specific user by userId param.
+ * GET /api/v1/admin/enrollments/user/:userId
+ */
+export const getUserEnrollments = async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const cacheKey = `userEnrollments:${userId}`;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
+    }
+
+    if ((redisClient as any).status === 'ready') {
+      const cachedEnrollments = await redisClient.get(cacheKey);
+      if (cachedEnrollments) {
+        const parsedCache = JSON.parse(cachedEnrollments);
+        return successResponse(res, parsedCache.data, 'Enrollments retrieved from cache');
+      }
+    }
+
+    const enrollments = await Enrollment.find({ userId }).populate('courseId');
+    const response = { data: enrollments };
+
+    if ((redisClient as any).status === 'ready') {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+      } catch (e) {
+        console.error('Failed to cache user enrollments', e);
+      }
+    }
+    successResponse(res, enrollments, 'Enrollments retrieved successfully');
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
+  }
+};
