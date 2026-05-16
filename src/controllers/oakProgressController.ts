@@ -78,7 +78,13 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
 
   const { lessonSlug, unitSlug, subjectSlug, keyStage } = req.body;
 
-  // 1. Validation: Freemium Check using unified utility
+  // Validate keyStage enum
+  const VALID_KEY_STAGES = ['ks1', 'ks2', 'ks3', 'ks4'];
+  if (!VALID_KEY_STAGES.includes(keyStage)) {
+    return next(new HttpError(400, `Invalid keyStage. Must be one of: ${VALID_KEY_STAGES.join(', ')}`, 'INVALID_KEY_STAGE'));
+  }
+
+  // Freemium Check: paid subjects require an active subscription
   if (PAID_SUBJECTS.includes(subjectSlug)) {
     if (isFreeUser(user)) {
       return next(
@@ -93,27 +99,42 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
 
   try {
     // 2. Find or Create Enrollment (Subject Level)
+    // The unique index is on { userId, subjectSlug } so a user can only enroll
+    // in a subject once regardless of key stage.
     let enrollment = await OakEnrollment.findOne({
       userId: user.id,
       subjectSlug,
-      keyStage,
     });
 
     if (!enrollment) {
-      enrollment = await OakEnrollment.create({
-        userId: user.id,
-        keyStage,
-        subjectSlug,
-        status: 'active',
-        startDate: new Date(),
-      });
+      try {
+        enrollment = await OakEnrollment.create({
+          userId: user.id,
+          keyStage,
+          subjectSlug,
+          status: 'active',
+          startDate: new Date(),
+        });
+      } catch (createErr: any) {
+        // Handle race-condition duplicate key errors gracefully
+        if (createErr.code === 11000) {
+          // Another request already created the enrollment — fetch it
+          enrollment = await OakEnrollment.findOne({ userId: user.id, subjectSlug });
+          if (!enrollment) {
+            return next(new HttpError(500, 'Failed to retrieve enrollment after conflict', 'INTERNAL_SERVER_ERROR'));
+          }
+          await enrollment.updateLastAccessed();
+        } else {
+          return next(createErr);
+        }
+      }
     } else {
       // Update access time
       await enrollment.updateLastAccessed();
     }
 
     // 3. Find or Create Progress (Lesson Level)
-    // We implicitly "start" the lesson upon enrollment call if lessonSlug is present
+    // Implicitly "start" the lesson upon enrollment call if lessonSlug is present
     if (lessonSlug && unitSlug) {
       const progress = await Progress.findOne({
         enrollmentId: enrollment._id,

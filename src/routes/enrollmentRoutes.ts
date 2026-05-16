@@ -11,6 +11,7 @@ import {
   getCourseEnrollments,
   updateEnrollmentStatus,
   dropCourse,
+  getEnrollmentStatus,
 } from '../controllers/enrollmentController';
 import validateRequest from '../middleware/validators/validateRequest';
 import { updateEnrollmentValidationRules } from '../middleware/validators/enrollmentValidators';
@@ -134,5 +135,27 @@ enrollmentRouter.put(
  *         description: Unauthorized
  */
 enrollmentRouter.delete('/:courseId/drop', authenticateJWT, isStudent, dropCourse);
+
+/**
+ * @swagger
+ * /api/v1/courses/{courseId}/enrollment-status:
+ *   get:
+ *     summary: Check if the authenticated user is enrolled in a course
+ *     tags: [Enrollments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Enrollment status for the current user
+ *       401:
+ *         description: Unauthorized
+ */
+enrollmentRouter.get('/:courseId/enrollment-status', authenticateJWT, getEnrollmentStatus);
 
 export default enrollmentRouter;
