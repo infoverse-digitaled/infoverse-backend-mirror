@@ -4,6 +4,7 @@ import { authenticateJWT } from '../middleware/authMiddleware';
 import validateRequest from '../middleware/validators/validateRequest'; // Reusing existing validator middleware wrapper
 import {
   enroll,
+  unenroll,
   updateProgress,
   submitQuiz,
   getMyProgress,
@@ -79,5 +80,19 @@ router.post('/activity', recordActivity);
  * @desc Get user's current streak
  */
 router.get('/streak', getStreak);
+
+/**
+ * @route DELETE /progress/enroll
+ * @desc Unenroll from a subject at a specific key stage (cascades progress deletion)
+ */
+router.delete(
+  '/enroll',
+  [
+    body('subjectSlug').notEmpty().withMessage('Subject slug is required'),
+    body('keyStage').notEmpty().withMessage('Key stage is required'),
+  ],
+  validateRequest,
+  unenroll,
+);
 
 export default router;

@@ -87,8 +87,9 @@ const OakEnrollmentSchema = new Schema<IOakEnrollment>(
   { timestamps: true },
 );
 
-// Compound index to prevent duplicate enrollments for the same user + subject
-OakEnrollmentSchema.index({ userId: 1, subjectSlug: 1 }, { unique: true });
+// Compound index: a user can enroll in the same subject at different key stages
+// e.g. KS1 English and KS2 English are independent enrollments
+OakEnrollmentSchema.index({ userId: 1, subjectSlug: 1, keyStage: 1 }, { unique: true });
 
 // Additional indexes for common queries
 OakEnrollmentSchema.index({ userId: 1, status: 1 });

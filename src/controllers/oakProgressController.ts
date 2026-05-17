@@ -98,12 +98,13 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
   }
 
   try {
-    // 2. Find or Create Enrollment (Subject Level)
-    // The unique index is on { userId, subjectSlug } so a user can only enroll
-    // in a subject once regardless of key stage.
+    // Find or Create Enrollment (Subject Level)
+    // Unique per { userId, subjectSlug, keyStage } — so KS1 English and KS2 English
+    // are completely independent enrollments.
     let enrollment = await OakEnrollment.findOne({
       userId: user.id,
       subjectSlug,
+      keyStage,
     });
 
     if (!enrollment) {
@@ -119,7 +120,7 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
         // Handle race-condition duplicate key errors gracefully
         if (createErr.code === 11000) {
           // Another request already created the enrollment — fetch it
-          enrollment = await OakEnrollment.findOne({ userId: user.id, subjectSlug });
+          enrollment = await OakEnrollment.findOne({ userId: user.id, subjectSlug, keyStage });
           if (!enrollment) {
             return next(new HttpError(500, 'Failed to retrieve enrollment after conflict', 'INTERNAL_SERVER_ERROR'));
           }
@@ -393,6 +394,46 @@ export const getStreak = async (req: Request, res: Response, next: NextFunction)
       streak: currentStreak,
       lastActiveAt: userDoc.lastActiveAt,
     }, 'Streak retrieved');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Unenroll a user from an Oak subject at a specific key stage.
+ * Cascades to delete all associated Progress records for that enrollment.
+ * DELETE /progress/enroll
+ */
+export const unenroll = async (req: Request, res: Response, next: NextFunction) => {
+  const { user } = req as AuthenticatedRequest;
+  if (!user) {
+    return next(new HttpError(401, 'Unauthorized', 'UNAUTHORIZED'));
+  }
+
+  const { subjectSlug, keyStage } = req.body;
+
+  if (!subjectSlug || !keyStage) {
+    return next(new HttpError(400, 'subjectSlug and keyStage are required', 'VALIDATION_ERROR'));
+  }
+
+  try {
+    const enrollment = await OakEnrollment.findOne({
+      userId: user.id,
+      subjectSlug,
+      keyStage,
+    });
+
+    if (!enrollment) {
+      return next(new HttpError(404, 'Enrollment not found', 'NOT_FOUND'));
+    }
+
+    // Cascade: delete all Progress records tied to this enrollment
+    await Progress.deleteMany({ enrollmentId: enrollment._id });
+
+    // Delete the enrollment itself
+    await OakEnrollment.findByIdAndDelete(enrollment._id);
+
+    successResponse(res, null, `Unenrolled from ${keyStage} ${subjectSlug} successfully`);
   } catch (error) {
     next(error);
   }
