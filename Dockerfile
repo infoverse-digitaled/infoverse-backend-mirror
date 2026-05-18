@@ -32,7 +32,6 @@ COPY --from=builder /app/dist ./dist
 # Cloud Run sets PORT environment variable
 ENV PORT=8080
 ENV NODE_ENV=production
-ENV GOOGLE_OAUTH_CLIENT_ID=$GOOGLE_OAUTH_CLIENT_ID
 # Expose the port
 EXPOSE 8080
 
