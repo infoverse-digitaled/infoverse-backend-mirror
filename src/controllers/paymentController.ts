@@ -22,7 +22,9 @@ export const startTrial = async (req: Request, res: Response) => {
 
     // Check if free trial is enabled
     if (!config.payment.enableFreeTrial) {
-      return res.status(403).json({ error: 'Free trial is currently disabled. Please proceed to payment.' });
+      return res
+        .status(403)
+        .json({ error: 'Free trial is currently disabled. Please proceed to payment.' });
     }
 
     const { planCode } = req.body;
@@ -43,7 +45,7 @@ export const startTrial = async (req: Request, res: Response) => {
       if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
         return res.status(400).json({
           error: 'You already have an active trial',
-          trialEndsAt: trialEndsAt
+          trialEndsAt: trialEndsAt,
         });
       }
     }
@@ -53,6 +55,20 @@ export const startTrial = async (req: Request, res: Response) => {
       const isValidPlan = Object.values(PAYSTACK_PLANS).some((p) => (p as any).code === planCode);
       if (!isValidPlan) {
         return res.status(400).json({ error: 'Invalid plan code' });
+      }
+
+      // Daily and Weekly plans do not include a free trial — must pay directly
+      const NO_TRIAL_PLAN_KEYS: (keyof typeof PAYSTACK_PLANS)[] = [
+        'INDIVIDUAL_DAILY',
+        'INDIVIDUAL_WEEKLY',
+      ];
+      const isNoTrialPlan = NO_TRIAL_PLAN_KEYS.some(
+        (key) => (PAYSTACK_PLANS[key] as any).code === planCode,
+      );
+      if (isNoTrialPlan) {
+        return res.status(400).json({
+          error: 'Daily and Weekly plans do not include a free trial. Please proceed to payment.',
+        });
       }
     }
 
@@ -190,7 +206,9 @@ export const verifyPayment = async (req: Request, res: Response) => {
       // Find the school's LicenseBatch via the admin's schoolCode or licenseKey
       const schoolCode = user.schoolCode || user.licenseKey;
       if (!schoolCode) {
-        return res.status(400).json({ error: 'No school code or license key associated with this account' });
+        return res
+          .status(400)
+          .json({ error: 'No school code or license key associated with this account' });
       }
 
       const batch = await LicenseBatch.findOne({ licenseKey: schoolCode });
@@ -219,7 +237,9 @@ export const verifyPayment = async (req: Request, res: Response) => {
       // --- Recurring subscription (plan) flow ---
       const planCode = verificationResult.data.plan;
       let planName = 'premium';
-      const planEntry = Object.entries(PAYSTACK_PLANS).find(([_, p]) => (p as any).code === planCode);
+      const planEntry = Object.entries(PAYSTACK_PLANS).find(
+        ([_, p]) => (p as any).code === planCode,
+      );
       if (planEntry) {
         planName = planEntry[0].toLowerCase();
       }
@@ -254,7 +274,9 @@ export const initializePayment = async (req: Request, res: Response) => {
 
     // Check if direct payment is enabled
     if (!config.payment.enableDirectPayment) {
-      return res.status(403).json({ error: 'Direct payment is currently disabled. Please start with a free trial.' });
+      return res
+        .status(403)
+        .json({ error: 'Direct payment is currently disabled. Please start with a free trial.' });
     }
 
     // Accept either a Paystack planCode (for recurring) or a tierId (for one-time term)
@@ -302,7 +324,7 @@ export const initializePayment = async (req: Request, res: Response) => {
       user.email,
       resolvedPlanCode,
       planAmount!,
-      callbackUrl
+      callbackUrl,
     );
 
     res.status(200).json({
@@ -311,8 +333,13 @@ export const initializePayment = async (req: Request, res: Response) => {
       reference: initializationData.data.reference,
     });
   } catch (error: any) {
-    console.error('Initialize Payment Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to initialize payment' });
+    console.error('Initialize Payment Error:', error?.response?.data || error);
+    // Surface the Paystack error message directly (e.g. "Plan not found")
+    const paystackMessage = error?.response?.data?.message;
+    const friendlyMessage = paystackMessage
+      ? `Payment provider error: ${paystackMessage}`
+      : error.message || 'Failed to initialize payment';
+    res.status(500).json({ error: friendlyMessage });
   }
 };
 
@@ -325,7 +352,7 @@ export const getPricing = async (_req: Request, res: Response) => {
     // Calculate annual savings: (monthly * 12) - annual
     const monthlyCost = PAYSTACK_PLANS.INDIVIDUAL_MONTHLY.amount;
     const annualCost = PAYSTACK_PLANS.INDIVIDUAL_ANNUAL.amount;
-    const annualSavings = (monthlyCost * 12) - annualCost;
+    const annualSavings = monthlyCost * 12 - annualCost;
     const savingsFormatted = `₦${(annualSavings / 100).toLocaleString()} per year`;
 
     const plans = [
