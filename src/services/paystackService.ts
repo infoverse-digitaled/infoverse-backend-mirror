@@ -37,7 +37,8 @@ export const initializePayment = async (
   email: string,
   planCode: string | null,
   amount: number,
-  callbackUrl: string
+  callbackUrl: string,
+  tierId?: string | null,
 ) => {
   try {
     const payload: any = {
@@ -46,7 +47,9 @@ export const initializePayment = async (
       callback_url: callbackUrl,
       metadata: {
         planCode,
-        paymentType: planCode ? 'direct' : 'one-time', 
+        paymentType: planCode ? 'direct' : 'one-time',
+        // Forward tierId so verifyPayment can update LicenseBatch.maxUsers correctly
+        ...(tierId && { tierId }),
       },
     };
 
@@ -67,6 +70,51 @@ export const initializePayment = async (
     throw error;
   }
 };
+
+
+/**
+ * Disable (cancel) an existing Paystack subscription so the customer is not
+ * billed twice when switching from one plan to another.
+ *
+ * Paystack requires both the subscription code AND the email_token that was
+ * sent to the customer. We use the /subscription/:code endpoint to fetch the
+ * token first, then call disable.
+ *
+ * Errors are swallowed with a warning so that a failed cancel never blocks
+ * a new payment from proceeding — worst case the customer contacts support.
+ */
+export const cancelSubscription = async (subscriptionCode: string): Promise<void> => {
+  try {
+    // 1. Fetch subscription details to get the email_token
+    const detailsRes = await axios.get(
+      `${PAYSTACK_BASE_URL}/subscription/${subscriptionCode}`,
+      { headers: getHeaders() }
+    );
+
+    const emailToken: string | undefined = detailsRes.data?.data?.email_token;
+
+    if (!emailToken) {
+      console.warn(`[Paystack] No email_token found for subscription ${subscriptionCode} — skipping cancel`);
+      return;
+    }
+
+    // 2. Disable the subscription
+    await axios.post(
+      `${PAYSTACK_BASE_URL}/subscription/disable`,
+      { code: subscriptionCode, token: emailToken },
+      { headers: getHeaders() }
+    );
+
+    console.log(`[Paystack] Subscription ${subscriptionCode} disabled successfully`);
+  } catch (error: any) {
+    // Non-fatal — log and continue so the new payment can still proceed
+    console.warn(
+      `[Paystack] Failed to cancel subscription ${subscriptionCode}:`,
+      error?.response?.data || error?.message
+    );
+  }
+};
+
 
 export const verifyAndCreateTrial = async (reference: string) => {
   try {

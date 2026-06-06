@@ -96,6 +96,11 @@ const UserSchema = new Schema<IUser>(
       trialEndsAt: {
         type: Date,
       },
+      // Paystack subscription code — needed to cancel before switching plans
+      paystackSubscriptionCode: {
+        type: String,
+        required: false,
+      },
     },
     // B2B License fields
     licenseKey: {

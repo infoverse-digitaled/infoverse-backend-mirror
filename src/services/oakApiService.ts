@@ -297,19 +297,53 @@ export class OakApiService {
           return [];
         }
 
-        // Filter subjects that have the requested key stage
-        const filteredSubjects = allSubjects
+        // Oak API now returns an array of strings for /subjects
+        const slugs = allSubjects
+          .map((s: any) => (typeof s === 'string' ? s : s.subjectSlug))
+          .filter(Boolean);
+
+        // Fetch detailed data for each subject to get keyStages mapping
+        // Use Promise.all with concurrency limit or just map since the list is small (~20)
+        const detailedResponses = await Promise.all(
+          slugs.map((slug: string) =>
+            this.axiosInstance.get<any>(`/subjects/${slug}`).catch(() => null),
+          ),
+        );
+
+        const detailedSubjects = detailedResponses
+          .filter((res) => res && res.data)
+          .map((res) => this.unwrap<any>(res!.data));
+
+        // Filter subjects that have the requested key stage in any of their sequences
+        const filteredSubjects = detailedSubjects
           .filter((subject) => {
-            // Check if this subject has content for the requested key stage
-            return subject.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage);
+            if (!subject.sequenceSlugs) return false;
+            return subject.sequenceSlugs.some((seq: any) =>
+              seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage),
+            );
           })
-          .map((subject) => ({
-            slug: subject.subjectSlug,
-            title: subject.subjectTitle,
-            // Include key stage information for reference
-            keyStages: subject.keyStages,
-            years: subject.years,
-          }));
+          .map((subject) => {
+            // Flatten keyStages from all sequences for the frontend
+            const allKeyStages = subject.sequenceSlugs
+              ? subject.sequenceSlugs.flatMap((seq: any) => seq.keyStages || [])
+              : [];
+
+            // Deduplicate keyStages by slug
+            const uniqueKeyStages = Array.from(
+              new Map(allKeyStages.map((ks: any) => [ks.keyStageSlug, ks])).values(),
+            );
+
+            return {
+              slug: subject.subjectSlug,
+              title:
+                subject.subjectTitle ||
+                subject.subjectSlug.charAt(0).toUpperCase() + subject.subjectSlug.slice(1),
+              keyStages: uniqueKeyStages,
+              years: subject.sequenceSlugs
+                ? subject.sequenceSlugs.flatMap((seq: any) => seq.years || [])
+                : [],
+            };
+          });
 
         return filteredSubjects;
       } catch (error) {

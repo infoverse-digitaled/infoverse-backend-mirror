@@ -12,17 +12,16 @@ export const BLOCKED_SUBJECTS = [
   'design-technology',
   'religious-education',
   'art',
-  'computing',
   'french',
   'german',
   'spanish',
   'latin',
 ];
 
-// Allowed subjects per key stage - english, maths, and science
+// Allowed subjects per key stage - english, maths, science, and computing
 export const ALLOWED_SUBJECTS: Record<string, string[]> = {
-  'ks1': ['english', 'maths', 'science'],
-  'ks2': ['english', 'maths', 'science'],
-  'ks3': ['english', 'maths', 'science'],
-  'ks4': ['english', 'maths', 'science'],
+  'ks1': ['english', 'maths', 'science', 'computing'],
+  'ks2': ['english', 'maths', 'science', 'computing'],
+  'ks3': ['english', 'maths', 'science', 'computing'],
+  'ks4': ['english', 'maths', 'science', 'computing'],
 };

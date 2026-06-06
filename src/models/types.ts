@@ -11,6 +11,7 @@ export interface IUser extends Document {
     status: 'free' | 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due';
     expiresAt?: Date;
     trialEndsAt?: Date;
+    paystackSubscriptionCode?: string; // Stored so we can cancel before switching plans
   };
   // B2B License fields
   licenseKey?: string;

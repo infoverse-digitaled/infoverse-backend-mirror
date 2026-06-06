@@ -6,8 +6,6 @@ import { PAYSTACK_PLANS, getActivePlanCodes } from '../config/paystack';
 import { successResponse } from '../middleware/response';
 import config from '../config';
 
-// Type guard or helper to find plan key from code could be useful,
-// but for now we map all paid plans to 'premium' in the User model.
 
 /**
  * Start a free trial (configurable days, default 7)
@@ -222,9 +220,18 @@ export const verifyPayment = async (req: Request, res: Response) => {
       const newExpiry = new Date(baseDate);
       newExpiry.setDate(newExpiry.getDate() + TERM_WEEKS * 7);
 
+      // Resolve the purchased tier's student limit so maxUsers is updated correctly.
+      // verificationResult.data.metadata.tierId is set when initializing a term payment.
+      const tierId: string | undefined = verificationResult.data.metadata?.tierId;
+      const tierKey = tierId?.toUpperCase() as keyof typeof PAYSTACK_PLANS | undefined;
+      const purchasedTier = tierKey ? (PAYSTACK_PLANS[tierKey] as any) : null;
+      const newMaxUsers: number | undefined = purchasedTier?.studentLimit;
+
       await LicenseBatch.findByIdAndUpdate(batch._id, {
         expiryDate: newExpiry,
         isActive: true,
+        // Only update maxUsers if the purchased tier has a defined student limit
+        ...(newMaxUsers && { maxUsers: newMaxUsers }),
       });
 
       return res.status(200).json({
@@ -320,11 +327,28 @@ export const initializePayment = async (req: Request, res: Response) => {
 
     const callbackUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/callback`;
 
+    // ── Cancel existing Paystack subscription before creating a new one ─────────
+    // This prevents double billing when a user switches between plans.
+    // We fetch a fresh copy of the user from the DB (req.user may be stale).
+    if (resolvedPlanCode) {
+      const freshUser = await User.findById(user.id || user.userId).lean();
+      const existingSubCode = freshUser?.subscription?.paystackSubscriptionCode;
+      if (existingSubCode) {
+        console.log(`[Payment] Cancelling old subscription ${existingSubCode} before switching plans`);
+        await paystackService.cancelSubscription(existingSubCode);
+        // Clear the stored code immediately so we don't double-cancel
+        await User.findByIdAndUpdate(user.id || user.userId, {
+          'subscription.paystackSubscriptionCode': null,
+        });
+      }
+    }
+
     const initializationData = await paystackService.initializePayment(
       user.email,
       resolvedPlanCode,
       planAmount!,
       callbackUrl,
+      tierId ?? null,  // Forward tierId so verifyPayment can update LicenseBatch.maxUsers
     );
 
     res.status(200).json({
@@ -419,5 +443,58 @@ export const getPlans = async (_req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Get Plans Error:', error);
     res.status(500).json({ error: error.message || 'Failed to retrieve plans' });
+  }
+};
+
+/**
+ * Cancel the authenticated user's active Paystack subscription.
+ * - Calls Paystack's disable API if a subscription code is stored.
+ * - Immediately downgrades the user to the free tier so premium content is
+ *   blocked right away, without waiting for the webhook.
+ * POST /api/v1/payment/cancel
+ */
+export const cancelUserSubscription = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Fetch a fresh copy — req.user may be stale/cached
+    const freshUser = await User.findById(user.id || user.userId);
+    if (!freshUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (freshUser.subscription?.status !== 'active') {
+      return res.status(400).json({ error: 'No active subscription to cancel' });
+    }
+
+    const subCode = freshUser.subscription?.paystackSubscriptionCode;
+
+    if (subCode) {
+      // Attempt Paystack cancellation — non-fatal if it fails
+      // (Paystack will also fire subscription.disable webhook to confirm)
+      await paystackService.cancelSubscription(subCode);
+    } else {
+      console.warn(`[Cancel] User ${freshUser.email} has no paystackSubscriptionCode — downgrading locally only`);
+    }
+
+    // Immediately downgrade to free tier in the DB regardless of Paystack result
+    await User.findByIdAndUpdate(freshUser._id, {
+      'subscription.status': 'cancelled',
+      'subscription.plan': 'free',
+      'subscription.paystackSubscriptionCode': null,
+      'subscription.trialEndsAt': null,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Subscription cancelled. Your account has been downgraded to the free tier.',
+    });
+  } catch (error: any) {
+    console.error('Cancel Subscription Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to cancel subscription' });
   }
 };

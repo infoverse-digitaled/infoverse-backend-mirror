@@ -115,6 +115,38 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           throw new HttpError(400, 'LICENSE_INACTIVE', 'The school associated with this code does not have an active subscription.');
         }
 
+        // Enforce student capacity via LicenseBatch even in the trial fallback path.
+        // The LicenseBatch record is created when the school admin registers (maxUsers = 100 for trial).
+        const adminLicenseBatch = await LicenseBatch.findOne({ licenseKey: schoolAdmin.schoolCode });
+
+        if (adminLicenseBatch) {
+          if (!adminLicenseBatch.isActive) {
+            throw new HttpError(400, 'LICENSE_INACTIVE', 'This school license is no longer active.');
+          }
+          if (new Date(adminLicenseBatch.expiryDate) <= new Date()) {
+            throw new HttpError(400, 'LICENSE_EXPIRED', 'This school license has expired.');
+          }
+          if (adminLicenseBatch.enrolledCount >= adminLicenseBatch.maxUsers) {
+            throw new HttpError(400, 'LICENSE_FULL', 'This school has reached its maximum student capacity.');
+          }
+          // Increment count atomically
+          adminLicenseBatch.enrolledCount += 1;
+          await adminLicenseBatch.save();
+        } else {
+          // No LicenseBatch exists yet — count students directly as a safety fallback
+          const currentStudentCount = await User.countDocuments({
+            role: 'student',
+            $or: [
+              { schoolCode: schoolAdmin.schoolCode },
+              { licenseKey: schoolAdmin.schoolCode },
+            ],
+          });
+          const MAX_TRIAL_STUDENTS = 100;
+          if (currentStudentCount >= MAX_TRIAL_STUDENTS) {
+            throw new HttpError(400, 'LICENSE_FULL', 'This school has reached its maximum student capacity.');
+          }
+        }
+
         userLicenseKey = schoolAdmin.schoolCode;
         organizationName = schoolAdmin.schoolName || schoolAdmin.organizationName;
       }
