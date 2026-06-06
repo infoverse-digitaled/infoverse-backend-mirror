@@ -76,15 +76,7 @@ app.options('{*path}', cors());
 // Serve static files from the 'public' directory at the root of the project.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// MongoDB connection
-mongoose
-  .connect(config.mongo.uri)
-  .then(() => {
-    logger.info('Connected to MongoDB');
-  })
-  .catch((err: Error) => {
-    logger.error('MongoDB connection error:', err);
-  });
+// Database connection is now handled before starting the server
 
 // Middleware setup
 setupMiddleware(app);
@@ -105,7 +97,18 @@ setupSwagger(app);
 // Global error handler
 app.use(errorHandler);
 
-// Start server AFTER all middleware and routes are configured
-startServer(app);
+// Start server AFTER all middleware, routes are configured AND database is connected
+const startApp = async () => {
+  try {
+    await mongoose.connect(config.mongo.uri);
+    logger.info('Connected to MongoDB');
+    startServer(app);
+  } catch (err) {
+    logger.error('MongoDB connection error:', err);
+    process.exit(1);
+  }
+};
+
+startApp();
 
 export default app;

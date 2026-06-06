@@ -31,13 +31,24 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     });
   }
 
+  // Handle database connection timeouts specifically
+  if (err.name === 'MongooseError' && err.message.includes('buffering timed out')) {
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'The server is currently unable to connect to the database. Please try again in a few minutes.',
+      },
+    });
+  }
+
   // For production, send a generic message
   if (config.env === 'production') {
     return res.status(500).json({
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Something went wrong',
+        message: 'Something went wrong. Please try again later.',
       },
     });
   }
