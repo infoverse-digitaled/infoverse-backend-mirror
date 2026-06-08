@@ -18,7 +18,7 @@ import {
   OakApiError,
 } from './oakApiTypes';
 import redisClient from '../config/redis'; // Direct import of the Redis client
-import { BLOCKED_UNIT_SLUGS } from '../config/oakBlockedUnits'; // Static hardcoded blocklist
+import { BLOCKED_UNIT_SLUGS, BLOCKED_LESSON_SLUGS } from '../config/oakBlockedUnits'; // Static hardcoded blocklist
 
 /**
  * Cache Time-To-Live (TTL) values in seconds
@@ -377,50 +377,52 @@ export class OakApiService {
         }
 
         // Step 2: Find the BEST sequence for the requested key stage
-        const candidateSequences =
-          subjectData.sequenceSlugs?.filter((seq: any) =>
-            seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage),
-          ) || [];
+        const allSequences = subjectData.sequenceSlugs || [];
+        
+        let matchingSequence: any = null;
 
-        if (candidateSequences.length === 0) {
+        // 1. First, try to find a sequence slug that explicitly includes the key stage (e.g. 'ks3')
+        matchingSequence = allSequences.find((seq: any) => {
+          const seqSlug = (seq.sequenceSlug || (typeof seq === 'string' ? seq : '')).toLowerCase();
+          // Match the exact key stage at the end or separated by a hyphen
+          return seqSlug.includes(`-${keyStage.toLowerCase()}`) || seqSlug.endsWith(keyStage.toLowerCase());
+        });
+
+        // 2. Fallback to previous logic if exact match not found
+        if (!matchingSequence) {
+          const candidateSequences = allSequences.filter((seq: any) =>
+            seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage),
+          );
+
+          if (candidateSequences.length > 0) {
+            const isSecondaryLevel = keyStage === 'ks3' || keyStage === 'ks4';
+            const isPrimaryLevel = keyStage === 'ks1' || keyStage === 'ks2';
+
+            matchingSequence = candidateSequences.find((seq: any) => {
+              const seqSlug = (seq.sequenceSlug || '').toLowerCase();
+              if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
+              if (isPrimaryLevel && seqSlug.includes('primary')) return true;
+              return false;
+            }) || candidateSequences[0];
+          }
+        }
+
+        if (!matchingSequence) {
           console.warn(
             `[OakAPI] No matching sequence found for keyStage=${keyStage} in subject=${subjectSlug}`,
           );
           return [];
         }
 
-        const isSecondaryLevel = keyStage === 'ks3' || keyStage === 'ks4';
-        const isPrimaryLevel = keyStage === 'ks1' || keyStage === 'ks2';
-
-        let matchingSequence = candidateSequences[0];
-
-        if (candidateSequences.length > 1) {
-          const bestMatch = candidateSequences.find((seq: any) => {
-            const seqSlug = (seq.sequenceSlug || '').toLowerCase();
-            if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
-            if (isPrimaryLevel && seqSlug.includes('primary')) return true;
-            return false;
-          });
-
-          if (bestMatch) {
-            matchingSequence = bestMatch;
-          } else {
-            const sorted = candidateSequences.sort((a: any, b: any) => {
-              const aKeyStages = a.keyStages?.length || 0;
-              const bKeyStages = b.keyStages?.length || 0;
-              return aKeyStages - bKeyStages;
-            });
-            matchingSequence = sorted[0];
-          }
-        }
+        const sequenceSlugToUse = matchingSequence.sequenceSlug || matchingSequence;
 
         console.log(
-          `[OakAPI] Selected sequence: ${matchingSequence.sequenceSlug} for ${keyStage}/${subjectSlug}`,
+          `[OakAPI] Selected sequence: ${sequenceSlugToUse} for ${keyStage}/${subjectSlug}`,
         );
 
         // Step 3: Fetch units for this sequence
         const unitsResponse = await this.axiosInstance.get<any>(
-          `/sequences/${matchingSequence.sequenceSlug}/units`,
+          `/sequences/${sequenceSlugToUse}/units`,
         );
         const yearlyUnits = this.unwrap<any[]>(unitsResponse.data);
 
@@ -642,7 +644,12 @@ export class OakApiService {
           return [];
         }
 
-        return lessons.map((lesson: any) => ({
+        // Filter out blocked/unavailable lessons
+        const filteredLessons = lessons.filter(
+          (lesson: any) => !BLOCKED_LESSON_SLUGS.has(lesson.lessonSlug)
+        );
+
+        return filteredLessons.map((lesson: any) => ({
           ...lesson,
           slug: lesson.lessonSlug, // Add normalized 'slug' field for frontend compatibility
           title: lesson.lessonTitle, // Add normalized 'title' field
@@ -931,8 +938,22 @@ export class OakApiService {
           params,
         });
 
-        // Unwrap Oak API response: { data: {...} } -> {...}
-        return this.unwrap<SearchResults<Lesson>>(response.data);
+        const searchResults = this.unwrap<any>(response.data);
+
+        // Filter out blocked lessons and units
+        if (searchResults && Array.isArray(searchResults.data)) {
+          searchResults.data = searchResults.data.filter((lesson: any) => {
+            const lessonSlug = lesson.lessonSlug || lesson.slug;
+            const unitSlug = lesson.unitSlug;
+            
+            if (lessonSlug && BLOCKED_LESSON_SLUGS.has(lessonSlug)) return false;
+            if (unitSlug && BLOCKED_UNIT_SLUGS.has(unitSlug)) return false;
+            
+            return true;
+          });
+        }
+
+        return searchResults;
       } catch (error) {
         return this.handleApiError(error);
       }

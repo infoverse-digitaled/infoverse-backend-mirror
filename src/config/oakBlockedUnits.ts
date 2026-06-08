@@ -3,6 +3,11 @@
  *
  * This is a static blocklist of unit slugs that are known to be inaccessible
  * via the Oak API, either due to:
+/**
+ * Oak API - Known Blocked/Unavailable Unit Slugs
+ *
+ * This is a static blocklist of unit slugs that are known to be inaccessible
+ * via the Oak API, either due to:
  *   - 400 Blocked:   The unit's content is copyright-restricted for API access
  *
  * These are filtered out of all curriculum lists so users never see them.
@@ -11,7 +16,10 @@
 
 export const BLOCKED_UNIT_SLUGS = new Set<string>([
 
-
+  // --- COMPUTING PRIMARY ---
+  'digital-writing', // Unit 2
+  'creating-animations-in-programs', // Unit 3
+  'building-sequences-in-programs', // Unit 6
   // --- ENGLISH PRIMARY: 400 Copyright Blocked ---
   'following-and-writing-instructions-to-make-a-sandwich-reading-and-writing',
   'the-three-little-pigs-reading-and-writing',
@@ -98,4 +106,16 @@ export const BLOCKED_UNIT_SLUGS = new Set<string>([
   'modern-text-third-deep-dive-4768',   // AQA/Edexcel/Eduqas: An Inspector Calls
   'modern-text-third-deep-dive-5164',   // AQA: Leave Taking
   'modern-text-third-deep-dive-5165',   // Eduqas: Leave Taking
+]);
+
+/**
+ * Oak API - Known Blocked/Unavailable Lesson Slugs
+ *
+ * This is a static blocklist of lesson slugs that are known to be inaccessible,
+ * either returning 400/404 errors or explicit "Lesson not available" errors.
+ */
+export const BLOCKED_LESSON_SLUGS = new Set<string>([
+  // --- COMPUTING PRIMARY ---
+  'comparing-computer-art-and-painting', // Unit 1 Lesson 6
+  'exploring-the-keyboard', // Unit 2 Lesson 1 (Covered by Unit block, but explicitly added per user report)
 ]);
