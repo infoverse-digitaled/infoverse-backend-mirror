@@ -36,11 +36,10 @@ app.use(compression({
   }
 }));
 
-// Configure CORS to allow requests from the Next.js frontend URL.
-// Support multiple origins for development (localhost) and production (Netlify)
+// Configure CORS to allow requests from the frontend.
+// Support multiple origins for development (localhost) and production (infoversedigitaleducation.net)
 const allowedOrigins = [
   config.frontendUrl,
-  'https://infoverse-ed.netlify.app',
   'https://infoversedigitaleducation.net',
   'http://localhost:3000', // Development
   'http://localhost:3001', // Development (alternate port)

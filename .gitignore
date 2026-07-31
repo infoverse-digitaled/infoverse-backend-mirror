@@ -144,5 +144,7 @@ vite.config.ts.timestamp-*
 !.env.vault
 
 # Debug reports and scripts
+session log..md
 src/scripts/debug
+src/scripts/
 *.txt
