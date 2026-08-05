@@ -43,6 +43,22 @@ const options = {
         name: 'Reviews',
         description: 'Course reviews and ratings',
       },
+      {
+        name: 'Oak Content',
+        description: 'Oak National Academy curriculum content — key stages, subjects, units, lessons, quizzes, and assets',
+      },
+      {
+        name: 'Oak Progress',
+        description: 'Enrollment, lesson progress tracking, quiz submissions, and streaks',
+      },
+      {
+        name: 'Payment',
+        description: 'Subscription plans, trial management, Paystack payment flow, and webhooks',
+      },
+      {
+        name: 'School',
+        description: 'School admin registration and student management',
+      },
     ],
   },
   // The path to your API route files, using path.resolve for robustness

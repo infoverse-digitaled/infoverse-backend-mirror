@@ -14,18 +14,56 @@ import {
 
 const router = Router();
 
+/**
+ * @swagger
+ * tags:
+ *   name: Oak Progress
+ *   description: Enrollment, lesson progress tracking, quiz submissions, and streaks
+ */
+
 // Apply auth to all progress routes (must be logged in to track progress)
 router.use(authenticateJWT);
 
 /**
- * @route GET /progress/my-progress
- * @desc Get all enrollments and progress for the current user
+ * @swagger
+ * /progress/my-progress:
+ *   get:
+ *     summary: Get all enrollments and progress for the current user
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of enrollments with progress returned successfully
+ *       401:
+ *         description: Not authenticated
  */
 router.get('/my-progress', getMyProgress);
 
 /**
- * @route POST /progress/enroll
- * @desc Enroll in a subject/lesson (starts tracking)
+ * @swagger
+ * /progress/enroll:
+ *   post:
+ *     summary: Enroll in a subject/lesson (starts progress tracking)
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             subjectSlug: maths
+ *             keyStage: ks3
+ *             unitSlug: algebra-basics
+ *             lessonSlug: solving-equations
+ *     responses:
+ *       201:
+ *         description: Enrollment created successfully
+ *       400:
+ *         description: Missing required fields
+ *       401:
+ *         description: Not authenticated
  */
 router.post(
   '/enroll',
@@ -40,8 +78,34 @@ router.post(
 );
 
 /**
- * @route PUT /progress/enrollments/:id/progress
- * @desc Update progress (heartbeat)
+ * @swagger
+ * /progress/enrollments/{id}/progress:
+ *   put:
+ *     summary: Update lesson progress for an enrollment (heartbeat)
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The enrollment ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           example:
+ *             unitSlug: algebra-basics
+ *             lessonSlug: solving-equations
+ *     responses:
+ *       200:
+ *         description: Progress updated successfully
+ *       401:
+ *         description: Not authenticated
+ *       404:
+ *         description: Enrollment not found
  */
 router.put(
   '/enrollments/:id/progress',
@@ -55,8 +119,39 @@ router.put(
 );
 
 /**
- * @route POST /progress/enrollments/:id/quiz
- * @desc Submit quiz answers
+ * @swagger
+ * /progress/enrollments/{id}/quiz:
+ *   post:
+ *     summary: Submit quiz answers for a lesson
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The enrollment ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             unitSlug: algebra-basics
+ *             lessonSlug: solving-equations
+ *             answers:
+ *               - questionId: q1
+ *                 answer: 42
+ *               - questionId: q2
+ *                 answer: "linear"
+ *     responses:
+ *       200:
+ *         description: Quiz submitted, score and pass/fail returned
+ *       400:
+ *         description: Missing or invalid fields
+ *       401:
+ *         description: Not authenticated
  */
 router.post(
   '/enrollments/:id/quiz',
@@ -70,20 +165,59 @@ router.post(
 );
 
 /**
- * @route POST /progress/activity
- * @desc Record user activity (for streak tracking)
+ * @swagger
+ * /progress/activity:
+ *   post:
+ *     summary: Record a user activity event (used for streak tracking)
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Activity recorded successfully
+ *       401:
+ *         description: Not authenticated
  */
 router.post('/activity', recordActivity);
 
 /**
- * @route GET /progress/streak
- * @desc Get user's current streak
+ * @swagger
+ * /progress/streak:
+ *   get:
+ *     summary: Get the current user's learning streak
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Streak data returned successfully
+ *       401:
+ *         description: Not authenticated
  */
 router.get('/streak', getStreak);
 
 /**
- * @route DELETE /progress/enroll
- * @desc Unenroll from a subject at a specific key stage (cascades progress deletion)
+ * @swagger
+ * /progress/enroll:
+ *   delete:
+ *     summary: Unenroll from a subject at a specific key stage (cascades progress deletion)
+ *     tags: [Oak Progress]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             subjectSlug: maths
+ *             keyStage: ks3
+ *     responses:
+ *       200:
+ *         description: Unenrolled successfully
+ *       400:
+ *         description: Missing required fields
+ *       401:
+ *         description: Not authenticated
  */
 router.delete(
   '/enroll',
@@ -94,5 +228,6 @@ router.delete(
   validateRequest,
   unenroll,
 );
+
 
 export default router;
