@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { helloController } from '../controllers';
-import { authenticateJWT } from '../middleware/authMiddleware';
+import { authenticateJWT, AuthenticatedRequest } from '../middleware/authMiddleware';
 import authRouter from './auth';
 import courseRouter from './courseRoutes';
 import enrollmentRouter from './enrollmentRoutes';
@@ -22,7 +22,7 @@ router.get('/', helloController);
 router.get('/profile', authenticateJWT, (req, res) => {
   res.json({
     message: 'You are authorized!',
-    user: (req as any).user,
+    user: (req as AuthenticatedRequest).user,
   });
 });
 

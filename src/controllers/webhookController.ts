@@ -10,7 +10,7 @@ import { PAYSTACK_PLANS } from '../config/paystack';
  */
 const resolvePlanName = (planCode: string | undefined): string => {
   if (!planCode) return 'premium';
-  const entry = Object.entries(PAYSTACK_PLANS).find(([, p]) => (p as any).code === planCode);
+  const entry = Object.entries(PAYSTACK_PLANS).find(([, p]) => p.code === planCode);
   // e.g. 'INDIVIDUAL_DAILY' → 'individual_daily'
   return entry ? entry[0].toLowerCase() : 'premium';
 };
@@ -100,9 +100,9 @@ export const handleWebhook = async (req: Request, res: Response) => {
         break;
     }
 
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (error) {
     console.error('Webhook Error:', error);
-    res.sendStatus(500);
+    return res.sendStatus(500);
   }
 };

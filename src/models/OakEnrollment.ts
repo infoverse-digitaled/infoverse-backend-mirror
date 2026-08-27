@@ -96,7 +96,7 @@ OakEnrollmentSchema.index({ userId: 1, status: 1 });
 OakEnrollmentSchema.index({ keyStage: 1, subjectSlug: 1 });
 
 // Instance method to update last accessed timestamp
-OakEnrollmentSchema.methods.updateLastAccessed = function () {
+OakEnrollmentSchema.methods.updateLastAccessed = function updateLastAccessed() {
   this.lastAccessedAt = new Date();
   return this.save();
 };

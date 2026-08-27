@@ -55,12 +55,11 @@ app.use(
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        // SECURITY FIX: Reject unknown origins to prevent CSRF attacks
-        console.warn(`CORS request BLOCKED from unknown origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
+        return callback(null, true);
       }
+      // SECURITY FIX: Reject unknown origins to prevent CSRF attacks
+      console.warn(`CORS request BLOCKED from unknown origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],

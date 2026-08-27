@@ -117,7 +117,7 @@ ProgressSchema.index({ enrollmentId: 1, unitSlug: 1 });
 ProgressSchema.index({ enrollmentId: 1, unitSlug: 1, status: 1 });
 
 // Instance method to mark lesson as completed
-ProgressSchema.methods.markCompleted = function (quizScore?: number) {
+ProgressSchema.methods.markCompleted = function markCompleted(quizScore?: number) {
   this.status = 'completed';
   this.completedAt = new Date();
   if (quizScore !== undefined) {
@@ -127,7 +127,7 @@ ProgressSchema.methods.markCompleted = function (quizScore?: number) {
 };
 
 // Static method to calculate unit progress
-ProgressSchema.statics.calculateUnitProgress = async function (
+ProgressSchema.statics.calculateUnitProgress = async function calculateUnitProgress(
   enrollmentId: mongoose.Types.ObjectId,
   unitSlug: string,
   totalLessons: number,

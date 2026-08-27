@@ -7,6 +7,7 @@ import LicenseBatch from '../models/LicenseBatch';
 import { HttpError } from '../utils/httpError';
 import config from '../config';
 import { successResponse } from '../middleware/response';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
 
 /**
  * Handles school admin registration and generates a unique school code.
@@ -93,8 +94,9 @@ export const registerSchoolAdmin = async (req: Request, res: Response, next: Nex
  */
 export const getStudents = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userRole = (req as any).user?.role;
-    const userId = (req as any).user?.userId || (req as any).user?.id; // Depends on your middleware
+    const { user } = req as AuthenticatedRequest;
+    const userRole = user?.role;
+    const userId = user?.id;
 
     if (userRole !== 'schooladmin') {
       throw new HttpError(403, 'FORBIDDEN', 'Only school admins can access this resource.');

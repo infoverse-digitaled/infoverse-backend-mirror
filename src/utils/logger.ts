@@ -4,8 +4,8 @@ import config from '../config';
 const { combine, timestamp, printf, colorize, align } = winston.format;
 
 // Custom log format
-const logFormat = printf(({ level, message, timestamp, stack }) => {
-  return `${timestamp} ${level}: ${message}${stack ? `\n${stack}` : ''}`;
+const logFormat = printf(({ level, message, timestamp: logTimestamp, stack }) => {
+  return `${logTimestamp} ${level}: ${message}${stack ? `\n${stack}` : ''}`;
 });
 
 // Build transports based on environment

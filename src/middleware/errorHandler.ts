@@ -3,6 +3,10 @@ import { HttpError } from '../utils/httpError';
 import logger from '../utils/logger';
 import config from '../config';
 
+// _next must stay unused: Express detects error-handling middleware by
+// function arity (exactly 4 params), so dropping it would stop this from
+// being recognized as an error handler at all.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   logger.error(err.message, { stack: err.stack });
 
@@ -19,8 +23,9 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   // Handle OakApiError and similar errors with statusCode
   if (err.statusCode && typeof err.statusCode === 'number') {
     const { statusCode } = err;
-    const code =
-      statusCode === 404 ? 'NOT_FOUND' : statusCode === 429 ? 'RATE_LIMIT_EXCEEDED' : 'API_ERROR';
+    let code = 'API_ERROR';
+    if (statusCode === 404) code = 'NOT_FOUND';
+    else if (statusCode === 429) code = 'RATE_LIMIT_EXCEEDED';
     return res.status(statusCode).json({
       success: false,
       error: {
@@ -54,7 +59,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   // For development, send a detailed error
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
