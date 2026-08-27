@@ -16,7 +16,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
-}, 60000);
+}, 180000);
 
 // Tear down MongoDB in-memory server after all tests
 afterAll(async () => {
