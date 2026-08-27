@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import OakEnrollment from '../models/OakEnrollment';
 import Progress from '../models/Progress';
@@ -61,9 +60,9 @@ export const getMyProgress = async (req: Request, res: Response, next: NextFunct
       }),
     );
 
-    successResponse(res, enrollmentsWithProgress, 'Progress retrieved successfully');
+    return successResponse(res, enrollmentsWithProgress, 'Progress retrieved successfully');
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -119,9 +118,11 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
           status: 'active',
           startDate: new Date(),
         });
-      } catch (createErr: any) {
+      } catch (createErr) {
         // Handle race-condition duplicate key errors gracefully
-        if (createErr.code === 11000) {
+        const isDuplicateKeyError =
+          createErr instanceof Error && (createErr as Error & { code?: number }).code === 11000;
+        if (isDuplicateKeyError) {
           // Another request already created the enrollment — fetch it
           enrollment = await OakEnrollment.findOne({ userId: user.id, subjectSlug, keyStage });
           if (!enrollment) {
@@ -162,9 +163,9 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
       }
     }
 
-    successResponse(res, enrollment, 'Enrolled successfully', 201);
+    return successResponse(res, enrollment, 'Enrolled successfully', 201);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -310,13 +311,13 @@ const calculateStreak = (activityDates: Date[]): number => {
   }
 
   let streak = 1;
-  for (let i = 0; i < uniqueDays.length - 1; i++) {
+  for (let i = 0; i < uniqueDays.length - 1; i += 1) {
     const current = new Date(uniqueDays[i]);
     const next = new Date(uniqueDays[i + 1]);
     const diffDays = Math.round((current.getTime() - next.getTime()) / 86400000);
 
     if (diffDays === 1) {
-      streak++;
+      streak += 1;
     } else {
       break;
     }
@@ -368,17 +369,16 @@ export const recordActivity = async (req: Request, res: Response, next: NextFunc
         currentStreak: newStreak,
       });
 
-      successResponse(res, { streak: newStreak, recorded: true }, 'Activity recorded');
-    } else {
-      // Already recorded today
-      successResponse(
-        res,
-        { streak: userDoc.currentStreak || 0, recorded: false },
-        'Activity already recorded today',
-      );
+      return successResponse(res, { streak: newStreak, recorded: true }, 'Activity recorded');
     }
+    // Already recorded today
+    return successResponse(
+      res,
+      { streak: userDoc.currentStreak || 0, recorded: false },
+      'Activity already recorded today',
+    );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -407,7 +407,7 @@ export const getStreak = async (req: Request, res: Response, next: NextFunction)
       await User.findByIdAndUpdate(user.id, { currentStreak });
     }
 
-    successResponse(
+    return successResponse(
       res,
       {
         streak: currentStreak,
@@ -416,7 +416,7 @@ export const getStreak = async (req: Request, res: Response, next: NextFunction)
       'Streak retrieved',
     );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -454,8 +454,8 @@ export const unenroll = async (req: Request, res: Response, next: NextFunction) 
     // Delete the enrollment itself
     await OakEnrollment.findByIdAndDelete(enrollment._id);
 
-    successResponse(res, null, `Unenrolled from ${keyStage} ${subjectSlug} successfully`);
+    return successResponse(res, null, `Unenrolled from ${keyStage} ${subjectSlug} successfully`);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };

@@ -9,25 +9,21 @@ const getHeaders = () => ({
 });
 
 export const initializeCardValidation = async (email: string, planCode: string) => {
-  try {
-    const response = await axios.post(
-      `${PAYSTACK_BASE_URL}/transaction/initialize`,
-      {
-        email,
-        amount: 5000, // NGN 50 to validate card
-        metadata: {
-          planCode,
-        },
+  const response = await axios.post(
+    `${PAYSTACK_BASE_URL}/transaction/initialize`,
+    {
+      email,
+      amount: 5000, // NGN 50 to validate card
+      metadata: {
+        planCode,
       },
-      {
-        headers: getHeaders(),
-      },
-    );
+    },
+    {
+      headers: getHeaders(),
+    },
+  );
 
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  return response.data;
 };
 
 /**
@@ -40,31 +36,33 @@ export const initializePayment = async (
   callbackUrl: string,
   tierId?: string | null,
 ) => {
-  try {
-    const payload: any = {
-      email,
-      amount, // Amount in kobo
-      callback_url: callbackUrl,
-      metadata: {
-        planCode,
-        paymentType: planCode ? 'direct' : 'one-time',
-        // Forward tierId so verifyPayment can update LicenseBatch.maxUsers correctly
-        ...(tierId && { tierId }),
-      },
-    };
+  const payload: {
+    email: string;
+    amount: number;
+    callback_url: string;
+    metadata: { planCode: string | null; paymentType: 'direct' | 'one-time'; tierId?: string };
+    plan?: string;
+  } = {
+    email,
+    amount, // Amount in kobo
+    callback_url: callbackUrl,
+    metadata: {
+      planCode,
+      paymentType: planCode ? 'direct' : 'one-time',
+      // Forward tierId so verifyPayment can update LicenseBatch.maxUsers correctly
+      ...(tierId && { tierId }),
+    },
+  };
 
-    if (planCode) {
-      payload.plan = planCode;
-    }
-
-    const response = await axios.post(`${PAYSTACK_BASE_URL}/transaction/initialize`, payload, {
-      headers: getHeaders(),
-    });
-
-    return response.data;
-  } catch (error) {
-    throw error;
+  if (planCode) {
+    payload.plan = planCode;
   }
+
+  const response = await axios.post(`${PAYSTACK_BASE_URL}/transaction/initialize`, payload, {
+    headers: getHeaders(),
+  });
+
+  return response.data;
 };
 
 /**
@@ -102,81 +100,74 @@ export const cancelSubscription = async (subscriptionCode: string): Promise<void
     );
 
     console.log(`[Paystack] Subscription ${subscriptionCode} disabled successfully`);
-  } catch (error: any) {
+  } catch (error) {
     // Non-fatal — log and continue so the new payment can still proceed
+    const detail = axios.isAxiosError(error) ? error.response?.data : undefined;
     console.warn(
       `[Paystack] Failed to cancel subscription ${subscriptionCode}:`,
-      error?.response?.data || error?.message,
+      detail || (error instanceof Error ? error.message : error),
     );
   }
 };
 
 export const verifyAndCreateTrial = async (reference: string) => {
-  try {
-    // 1. Verify Transaction
-    const verifyResponse = await axios.get(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
-      headers: getHeaders(),
-    });
+  // 1. Verify Transaction
+  const verifyResponse = await axios.get(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
+    headers: getHeaders(),
+  });
 
-    const transactionData = verifyResponse.data.data;
+  const transactionData = verifyResponse.data.data;
 
-    if (transactionData.status !== 'success') {
-      throw new Error('Transaction verification failed');
-    }
-
-    const authorizationCode = transactionData.authorization.authorization_code;
-    const planCode = transactionData.metadata?.planCode;
-
-    if (!authorizationCode || !planCode) {
-      throw new Error('Missing authorization code or plan code');
-    }
-
-    // 2. Start Subscription Immediately
-    const startDate = new Date(); // Start now
-
-    // 3. Create Subscription
-    const subscriptionResponse = await axios.post(
-      `${PAYSTACK_BASE_URL}/subscription`,
-      {
-        customer: transactionData.customer.email,
-        plan: planCode,
-        authorization: authorizationCode,
-        start_date: startDate.toISOString(),
-      },
-      {
-        headers: getHeaders(),
-      },
-    );
-
-    return subscriptionResponse.data;
-  } catch (error) {
-    throw error;
+  if (transactionData.status !== 'success') {
+    throw new Error('Transaction verification failed');
   }
+
+  const authorizationCode = transactionData.authorization.authorization_code;
+  const planCode = transactionData.metadata?.planCode;
+
+  if (!authorizationCode || !planCode) {
+    throw new Error('Missing authorization code or plan code');
+  }
+
+  // 2. Start Subscription Immediately
+  const startDate = new Date(); // Start now
+
+  // 3. Create Subscription
+  const subscriptionResponse = await axios.post(
+    `${PAYSTACK_BASE_URL}/subscription`,
+    {
+      customer: transactionData.customer.email,
+      plan: planCode,
+      authorization: authorizationCode,
+      start_date: startDate.toISOString(),
+    },
+    {
+      headers: getHeaders(),
+    },
+  );
+
+  return subscriptionResponse.data;
 };
 
 /**
  * Verify a payment transaction (for direct payments where subscription is auto-created)
  */
 export const verifyPayment = async (reference: string) => {
-  try {
-    const verifyResponse = await axios.get(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
-      headers: getHeaders(),
-    });
+  const verifyResponse = await axios.get(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
+    headers: getHeaders(),
+  });
 
-    const transactionData = verifyResponse.data.data;
+  const transactionData = verifyResponse.data.data;
 
-    if (transactionData.status !== 'success') {
-      throw new Error('Transaction verification failed');
-    }
-
-    return {
-      success: true,
-      data: transactionData,
-      planCode: transactionData.metadata?.planCode,
-      paymentType: transactionData.metadata?.paymentType,
-      email: transactionData.customer?.email,
-    };
-  } catch (error) {
-    throw error;
+  if (transactionData.status !== 'success') {
+    throw new Error('Transaction verification failed');
   }
+
+  return {
+    success: true,
+    data: transactionData,
+    planCode: transactionData.metadata?.planCode,
+    paymentType: transactionData.metadata?.paymentType,
+    email: transactionData.customer?.email,
+  };
 };

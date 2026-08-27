@@ -9,7 +9,6 @@ import { HttpError } from '../utils/httpError';
 import config from '../config';
 import { successResponse } from '../middleware/response';
 import { emailQueue } from '../utils/emailQueue';
-import { isTrialExpired, getSubscriptionTier } from '../utils/subscriptionUtils';
 
 const client = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
 
@@ -342,14 +341,14 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
       throw new HttpError(401, 'INVALID_TOKEN', 'Invalid Google token.');
     }
 
-    const { email, name, given_name } = payload;
+    const { email, name, given_name: givenName } = payload;
 
     let user = await User.findOne({ email });
 
     if (!user) {
       // Auto-create account for new users via Google
       user = await User.create({
-        name: name || given_name || email.split('@')[0],
+        name: name || givenName || email.split('@')[0],
         email,
         // passwordHash is omitted because they use OAuth
         subscription: {
@@ -432,12 +431,12 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
         text: message,
       });
 
-      successResponse(
+      return successResponse(
         res,
         null,
         'If a user with that email exists, a password reset token has been sent.',
       );
-    } catch (err) {
+    } catch {
       // If email fails, clear the token from the database
       user.resetPasswordToken = undefined;
       user.resetPasswordExpires = undefined;
@@ -450,8 +449,8 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
         ),
       );
     }
-  } catch (error) {
-    next(new HttpError(500, 'INTERNAL_SERVER_ERROR', 'An unexpected error occurred.'));
+  } catch {
+    return next(new HttpError(500, 'INTERNAL_SERVER_ERROR', 'An unexpected error occurred.'));
   }
 };
 
@@ -487,9 +486,9 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       .setExpirationTime(config.jwt.expiresIn)
       .sign(secret);
 
-    successResponse(res, { token }, 'Password has been reset successfully.');
-  } catch (error) {
-    next(
+    return successResponse(res, { token }, 'Password has been reset successfully.');
+  } catch {
+    return next(
       new HttpError(
         500,
         'INTERNAL_SERVER_ERROR',
@@ -505,7 +504,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
  */
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
 
     if (!userId) {
       throw new HttpError(401, 'UNAUTHORIZED', 'User not authenticated.');

@@ -32,16 +32,15 @@ const executeWithBackoff = async <T>(
   let attempt = 0;
   while (attempt < maxRetries) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- must observe each attempt's outcome before deciding whether/how long to back off before retrying
       return await operation();
-    } catch (error: any) {
-      attempt++;
+    } catch (error) {
+      attempt += 1;
 
+      const status = (error as { status?: number })?.status;
       // We only want to retry on specific transient errors (429 Rate Limit, 503 Unavaiable)
       // If error is something else, or we're on the last attempt, immediately throw
-      if (
-        attempt >= maxRetries ||
-        (error.status && error.status !== 429 && error.status !== 500 && error.status !== 503)
-      ) {
+      if (attempt >= maxRetries || (status && status !== 429 && status !== 500 && status !== 503)) {
         throw error;
       }
 
@@ -51,7 +50,10 @@ const executeWithBackoff = async <T>(
         `[Gemini] API request failed. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`,
       );
 
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      // eslint-disable-next-line no-await-in-loop -- deliberate backoff pause between retries
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, delay);
+      });
     }
   }
   throw new Error('Exponential backoff failed');
@@ -74,7 +76,7 @@ export const checkRateLimit = (userId: string): boolean => {
     return false;
   }
 
-  userRate.count++;
+  userRate.count += 1;
   return true;
 };
 
@@ -128,19 +130,23 @@ Please answer the student's question:`;
 
     logger.info(`AI Tutor response generated for user ${userId}`);
     return text;
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpError) {
       throw error;
     }
     // Log detailed error info including cause chain
+    const cause =
+      error instanceof Error
+        ? ((error as Error & { cause?: unknown }).cause as Record<string, unknown> | undefined)
+        : undefined;
     logger.error('Gemini API error:', {
-      message: error?.message,
-      name: error?.name,
-      cause: error?.cause?.message || error?.cause,
-      causeCode: error?.cause?.code,
-      errno: error?.cause?.errno,
-      syscall: error?.cause?.syscall,
-      stack: error?.stack?.split('\n').slice(0, 5).join('\n'),
+      message: error instanceof Error ? error.message : error,
+      name: error instanceof Error ? error.name : undefined,
+      cause: (cause as { message?: string })?.message || cause,
+      causeCode: cause?.code,
+      errno: cause?.errno,
+      syscall: cause?.syscall,
+      stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5).join('\n') : undefined,
     });
     throw new HttpError(500, 'AI_ERROR', 'Failed to generate AI response. Please try again.');
   }
@@ -186,7 +192,7 @@ Generate a summary:`;
     }
 
     return text;
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpError) {
       throw error;
     }
@@ -242,7 +248,7 @@ Explain the concept:`;
     }
 
     return text;
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpError) {
       throw error;
     }

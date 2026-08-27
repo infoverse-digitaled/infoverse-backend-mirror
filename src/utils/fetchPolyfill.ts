@@ -9,7 +9,7 @@
  * All configurations must run synchronously before other modules load.
  */
 
-/* eslint-disable @typescript-eslint/no-var-requires */
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 // Configure DNS to use Google DNS - MUST happen before any network requests
 const dns = require('dns');
@@ -20,14 +20,26 @@ console.log('[DNS] Configured to use Google DNS:', dns.getServers());
 // Polyfill fetch with node-fetch for better compatibility
 const nodeFetch = require('node-fetch');
 
+/* eslint-enable @typescript-eslint/no-require-imports */
+
+// node-fetch's exports are structurally compatible with the ambient
+// fetch/Headers/Request/Response globals Node's own lib types declare, but
+// aren't typed as such - a single scoped cast here is clearer than `any` at
+// every assignment or re-declaring globals that already exist in lib.dom.
+type FetchGlobals = {
+  fetch: typeof fetch;
+  Headers: typeof Headers;
+  Request: typeof Request;
+  Response: typeof Response;
+};
+
 if (typeof global !== 'undefined') {
-  (global as any).fetch = nodeFetch;
-  (global as any).Headers = nodeFetch.Headers;
-  (global as any).Request = nodeFetch.Request;
-  (global as any).Response = nodeFetch.Response;
+  const target = global as unknown as FetchGlobals;
+  target.fetch = nodeFetch;
+  target.Headers = nodeFetch.Headers;
+  target.Request = nodeFetch.Request;
+  target.Response = nodeFetch.Response;
   console.log('[Fetch] Polyfilled with node-fetch');
 }
-
-/* eslint-enable @typescript-eslint/no-var-requires */
 
 export {};

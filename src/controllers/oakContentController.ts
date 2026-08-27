@@ -55,7 +55,7 @@ export const getSubjects = async (req: Request, res: Response, next: NextFunctio
     const { keyStage } = req.params;
 
     // Get subjects from Oak API - now properly unwrapped to array
-    let subjects: any[] = await oakApiService.getSubjectsByKeyStage(keyStage);
+    let subjects = await oakApiService.getSubjectsByKeyStage(keyStage);
 
     // Step 1: Filter subjects to only those allowed for this key stage
     const allowedSubjectsForKeyStage = ALLOWED_SUBJECTS[keyStage] || [];
@@ -67,11 +67,9 @@ export const getSubjects = async (req: Request, res: Response, next: NextFunctio
     // Step 3: Lock paid subjects for free users
     const freeUser = isFreeUser(req as AuthenticatedRequest);
     if (freeUser) {
-      subjects.forEach((subject) => {
-        if (PAID_SUBJECTS.includes(subject.slug)) {
-          subject.locked = true;
-        }
-      });
+      subjects = subjects.map((subject) =>
+        PAID_SUBJECTS.includes(subject.slug) ? { ...subject, locked: true } : subject,
+      );
     }
 
     successResponse(
@@ -131,7 +129,7 @@ export const getUnitDetails = async (req: Request, res: Response, next: NextFunc
 export const getLessons = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { unitSlug } = req.params;
-    let lessons: any[] = await oakApiService.getLessons(unitSlug);
+    let lessons = await oakApiService.getLessons(unitSlug);
 
     // Lock lessons on paid subjects for free users, mirroring getSubjects.
     if (isFreeUser(req as AuthenticatedRequest)) {
@@ -225,10 +223,6 @@ export const getLessonAssets = async (req: Request, res: Response, next: NextFun
 export const getAssetFile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { lessonSlug, assetType } = req.params;
-
-    const oakApiKey = process.env.OAK_API_KEY;
-    const oakBaseUrl =
-      process.env.OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0';
 
     // CORS headers
     const requestOrigin = req.headers.origin || 'https://infoversedigitaleducation.net';
@@ -324,14 +318,14 @@ export const clearSubjectCache = async (req: Request, res: Response, next: NextF
 
     const deletedCount = await oakApiService.clearSubjectCache(keyStage, subjectSlug);
 
-    successResponse(
+    return successResponse(
       res,
       { deletedCount, keyStage, subjectSlug },
       `Cache cleared for ${keyStage}/${subjectSlug}. ${deletedCount} keys deleted.`,
       200,
     );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -350,14 +344,14 @@ export const clearKeyStageCache = async (req: Request, res: Response, next: Next
 
     const deletedCount = await oakApiService.clearKeyStageCache(keyStage);
 
-    successResponse(
+    return successResponse(
       res,
       { deletedCount, keyStage },
       `Cache cleared for ${keyStage}. ${deletedCount} keys deleted.`,
       200,
     );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -412,8 +406,9 @@ export const searchLessons = async (req: Request, res: Response, next: NextFunct
       // RELIABILITY FIX: Handle missing subject fields
       results = {
         ...results,
-        data: results.data.filter((lesson: any) => {
-          const lessonSubject = lesson.subjectSlug || lesson.subject || '';
+        data: results.data.filter((lesson) => {
+          const lessonSubject =
+            lesson.subjectSlug || (lesson as { subject?: string }).subject || '';
           // Block if subject is unknown (could be paid content)
           if (!lessonSubject) return false;
           return !PAID_SUBJECTS.includes(lessonSubject);
@@ -421,8 +416,8 @@ export const searchLessons = async (req: Request, res: Response, next: NextFunct
       };
 
       // Mark any remaining paid content as locked (if it slips through)
-      results.data = results.data.map((lesson: any) => {
-        const lessonSubject = lesson.subjectSlug || lesson.subject || '';
+      results.data = results.data.map((lesson) => {
+        const lessonSubject = lesson.subjectSlug || (lesson as { subject?: string }).subject || '';
         if (PAID_SUBJECTS.includes(lessonSubject)) {
           return { ...lesson, locked: true };
         }
