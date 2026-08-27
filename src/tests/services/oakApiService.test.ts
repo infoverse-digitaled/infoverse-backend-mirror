@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { OakApiService, RedisClientInterface } from '../../services/oakApiService';
 import { KeyStage } from '../../services/oakApiTypes';
 
@@ -38,7 +38,9 @@ jest.mock('../../config/redis', () => ({
 // Mock axios.isAxiosError for error handling
 jest
   .spyOn(axios, 'isAxiosError')
-  .mockImplementation((payload: any) => payload?.isAxiosError === true);
+  .mockImplementation(
+    (payload: unknown) => (payload as { isAxiosError?: boolean })?.isAxiosError === true,
+  );
 
 // Create mock Redis client
 const createMockRedis = (): jest.Mocked<RedisClientInterface> => ({
@@ -90,7 +92,7 @@ describe('OakApiService', () => {
     // Create fresh mocks for each test
     mockRedis = createMockRedis();
     mockAxiosInstance = createMockAxios();
-    service = new OakApiService(mockRedis, mockAxiosInstance as any);
+    service = new OakApiService(mockRedis, mockAxiosInstance as unknown as AxiosInstance);
   });
 
   describe('getKeyStages', () => {

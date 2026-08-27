@@ -23,10 +23,7 @@ afterAll(async () => {
 // Clear all test data after each test
 afterEach(async () => {
   const { collections } = mongoose.connection;
-  for (const key in collections) {
-    const collection = collections[key];
-    await collection.deleteMany({});
-  }
+  await Promise.all(Object.values(collections).map((collection) => collection.deleteMany({})));
 });
 
 describe('Test Data Factories', () => {

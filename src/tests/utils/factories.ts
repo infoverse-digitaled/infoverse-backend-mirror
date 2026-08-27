@@ -75,9 +75,9 @@ export const createTestProgress = async (
     // We need to fetch the user if only enrollment is passed.
     finalUser = user || (await User.findById(finalEnrollment.userId))!;
   } else {
-    const { user: new_user, enrollment: new_enrollment } = await createTestOakEnrollment(user);
-    finalUser = new_user;
-    finalEnrollment = new_enrollment;
+    const { user: newUser, enrollment: newEnrollment } = await createTestOakEnrollment(user);
+    finalUser = newUser;
+    finalEnrollment = newEnrollment;
   }
 
   const defaultProgress = {

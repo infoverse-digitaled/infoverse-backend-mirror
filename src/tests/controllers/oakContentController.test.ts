@@ -2,9 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import {
   getKeyStages,
   getSubjects,
-  getUnits,
   getLessons,
-  getLessonDetails,
   searchLessons,
 } from '../../controllers/oakContentController';
 import oakApiService from '../../services/oakApiService';
@@ -30,7 +28,7 @@ jest.mock('../../config/curriculum', () => ({
 }));
 
 describe('OakContentController', () => {
-  let req: Partial<Request> & { user?: any };
+  let req: Partial<Request> & { user?: { subscription?: { plan: string; status: string } } };
   let res: Partial<Response>;
   let next: NextFunction;
 
