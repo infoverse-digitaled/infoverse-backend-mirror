@@ -6,6 +6,31 @@ import { PAYSTACK_PLANS, getActivePlanCodes } from '../config/paystack';
 import { successResponse } from '../middleware/response';
 import config from '../config';
 
+/**
+ * Whether a client-supplied Paystack callback URL may be used.
+ *
+ * Accepts the mobile app's own URL scheme and any path on the configured
+ * frontend origin. Everything else is rejected so a caller cannot point a
+ * payment redirect at a host we do not control.
+ */
+const isAllowedCallbackUrl = (candidate: unknown): candidate is string => {
+  if (typeof candidate !== 'string' || !candidate) return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol === `${config.mobileAppScheme}:`) return true;
+
+  try {
+    return parsed.origin === new URL(config.frontendUrl).origin;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Start a free trial (configurable days, default 7)
@@ -287,7 +312,7 @@ export const initializePayment = async (req: Request, res: Response) => {
     }
 
     // Accept either a Paystack planCode (for recurring) or a tierId (for one-time term)
-    const { planCode, tierId } = req.body;
+    const { planCode, tierId, callbackUrl: requestedCallbackUrl } = req.body;
     const user = (req as any).user;
 
     if (!user || !user.email) {
@@ -325,7 +350,15 @@ export const initializePayment = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Either planCode or tierId is required' });
     }
 
-    const callbackUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/callback`;
+    // The web app returns to its own /payment/callback page. The mobile app
+    // cannot — an in-app browser has to be handed back to the app's own URL
+    // scheme — so clients may request a callback, validated against an
+    // allow-list. Anything unrecognised falls back to the web callback rather
+    // than letting a caller redirect a payment anywhere it likes.
+    const defaultCallbackUrl = `${config.frontendUrl}/payment/callback`;
+    const callbackUrl = isAllowedCallbackUrl(requestedCallbackUrl)
+      ? requestedCallbackUrl
+      : defaultCallbackUrl;
 
     // ── Cancel existing Paystack subscription before creating a new one ─────────
     // This prevents double billing when a user switches between plans.

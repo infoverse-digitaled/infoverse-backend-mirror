@@ -24,6 +24,8 @@ interface AppConfig {
   jwtSecret: string; // Shorthand for jwt.secret
   frontendUrl: string;
   backendUrl: string;
+  /** Custom URL scheme of the mobile app, used to validate payment callbacks. */
+  mobileAppScheme: string;
   oak: {
     apiBaseUrl: string;
     apiKey: string;
@@ -160,6 +162,7 @@ const validateConfig = (): AppConfig => {
     jwtSecret: JWT_SECRET,
     frontendUrl,
     backendUrl,
+    mobileAppScheme: process.env.MOBILE_APP_SCHEME || 'infoversemobile',
     oak: {
       apiBaseUrl: OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0',
       apiKey: OAK_API_KEY || '',

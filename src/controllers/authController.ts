@@ -292,9 +292,16 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
       throw new HttpError(400, 'MISSING_CREDENTIAL', 'Google credential is required.');
     }
 
+    
+    const allowedAudiences = [
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_IOS_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_ANDROID_CLIENT_ID,
+    ].filter((id): id is string => !!id);
+
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_OAUTH_CLIENT_ID,
+      audience: allowedAudiences,
     });
     
     const payload = ticket.getPayload();
@@ -358,8 +365,8 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
 
 export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. Get user based on posted email
-    const { email } = req.body;
+    
+    const { email, platform } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
       return successResponse(
@@ -379,7 +386,10 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     // 4. Send the token to the user's email
     try {
-      const resetURL = `${config.frontendUrl}/reset-password/${resetToken}`;
+      const resetURL =
+        platform === 'mobile'
+          ? `${config.mobileAppScheme}://reset-password/${resetToken}`
+          : `${config.frontendUrl}/reset-password/${resetToken}`;
       const message = `Forgot your password? Click the link to reset it: ${resetURL}\n\nIf you didn't forget your password, please ignore this email. This link is valid for 10 minutes.`;
 
       // Add email job to the queue
