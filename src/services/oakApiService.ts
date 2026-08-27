@@ -1,17 +1,11 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios';
 import https from 'https';
-import http from 'http';
-import { URL } from 'url';
-import got from 'got';
+import { Readable } from 'stream';
 import config from '../config';
 import {
   KeyStage,
-  Subject,
-  Unit,
   Lesson,
-  LessonDetails,
   Video,
-  Quiz,
   LessonQuiz,
   SearchFilters,
   SearchResults,
@@ -19,6 +13,7 @@ import {
 } from './oakApiTypes';
 import redisClient from '../config/redis'; // Direct import of the Redis client
 import { BLOCKED_UNIT_SLUGS, BLOCKED_LESSON_SLUGS } from '../config/oakBlockedUnits'; // Static hardcoded blocklist
+import { OakApiRequestError } from './oakApiErrors';
 
 /**
  * Cache Time-To-Live (TTL) values in seconds
@@ -33,6 +28,16 @@ const CACHE_TTL = {
 };
 
 /**
+ * Oak National Academy's API has no published/versioned schema, and its JSON
+ * shape varies significantly across endpoints and content types (units vs.
+ * unitOptions vs. examSubject tiers, etc.) - modeling it exactly here would
+ * mean reverse-engineering and locking to their internal representation, so
+ * it's handled as an open record instead.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OakJson = Record<string, any>;
+
+/**
  * Interface for Redis client dependency
  */
 export interface RedisClientInterface {
@@ -40,6 +45,53 @@ export interface RedisClientInterface {
   setEx(key: string, seconds: number, value: string): Promise<unknown>;
   keys(pattern: string): Promise<string[]>;
   del(...keys: string[]): Promise<number>;
+}
+
+/**
+ * Unwrap Oak API response structure
+ * Oak API returns { data: [...] } but we need just [...]
+ */
+function unwrap<T>(response: unknown): T {
+  // Check if response has a 'data' property
+  if (response && typeof response === 'object' && 'data' in response) {
+    return (response as { data: T }).data;
+  }
+  // Otherwise return the response as-is
+  return response as T;
+}
+
+/**
+ * Handle API errors and transform them into a consistent format
+ */
+function handleApiError(error: unknown): never {
+  // Add debugging log to see what exactly is blowing up
+  console.error('[OakAPI] handleApiError caught:', error instanceof Error ? error.message : error);
+
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError<OakApiError>;
+
+    if (axiosError.response) {
+      const statusCode = axiosError.response.status;
+      const message =
+        axiosError.response.data?.message || axiosError.message || 'Oak API request failed';
+
+      throw new OakApiRequestError({
+        message,
+        statusCode,
+        error: axiosError.response.data?.error,
+      });
+    }
+
+    throw new OakApiRequestError({
+      message: axiosError.message || 'Network error',
+      statusCode: 500,
+    });
+  }
+
+  throw new OakApiRequestError({
+    message: error instanceof Error ? error.message : 'Unknown error',
+    statusCode: 500,
+  });
 }
 
 /**
@@ -97,10 +149,12 @@ export class OakApiService {
         }
 
         // --- RETRY LOGIC FOR TIMEOUTS & SERVER ERRORS ---
-        const config = error.config as any;
-        if (config) {
-          if (!config.retryCount) {
-            config.retryCount = 0;
+        const requestConfig = error.config as
+          | (AxiosRequestConfig & { retryCount?: number })
+          | undefined;
+        if (requestConfig) {
+          if (!requestConfig.retryCount) {
+            requestConfig.retryCount = 0;
           }
 
           const maxRetries = 2;
@@ -108,37 +162,28 @@ export class OakApiService {
           const isServerError = error.response && error.response.status >= 500;
           const isRateLimit = error.response?.status === 429;
 
-          if ((isTimeout || isServerError || isRateLimit) && config.retryCount < maxRetries) {
-            config.retryCount += 1;
+          if (
+            (isTimeout || isServerError || isRateLimit) &&
+            requestConfig.retryCount < maxRetries
+          ) {
+            requestConfig.retryCount += 1;
             console.warn(
-              `[OakAPI] Request failed (${error.message}). Retrying (${config.retryCount}/${maxRetries})...`,
+              `[OakAPI] Request failed (${error.message}). Retrying (${requestConfig.retryCount}/${maxRetries})...`,
             );
 
             // Exponential backoff
-            const delay = isRateLimit ? 5000 : 1000 * 2 ** config.retryCount;
+            const delay = isRateLimit ? 5000 : 1000 * 2 ** requestConfig.retryCount;
 
-            return new Promise((resolve) => setTimeout(resolve, delay)).then(() =>
-              this.axiosInstance(config),
-            );
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, delay);
+            });
+            return this.axiosInstance(requestConfig);
           }
         }
 
         return Promise.reject(error);
       },
     );
-  }
-
-  /**
-   * Unwrap Oak API response structure
-   * Oak API returns { data: [...] } but we need just [...]
-   */
-  private unwrap<T>(response: any): T {
-    // Check if response has a 'data' property
-    if (response && typeof response === 'object' && 'data' in response) {
-      return response.data as T;
-    }
-    // Otherwise return the response as-is
-    return response as T;
   }
 
   /**
@@ -200,43 +245,6 @@ export class OakApiService {
   }
 
   /**
-   * Handle API errors and transform them into a consistent format
-   */
-  private handleApiError(error: unknown): never {
-    // Add debugging log to see what exactly is blowing up
-    console.error(
-      '[OakAPI] handleApiError caught:',
-      error instanceof Error ? error.message : error,
-    );
-
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<OakApiError>;
-
-      if (axiosError.response) {
-        const statusCode = axiosError.response.status;
-        const message =
-          axiosError.response.data?.message || axiosError.message || 'Oak API request failed';
-
-        throw {
-          message,
-          statusCode,
-          error: axiosError.response.data?.error,
-        } as OakApiError;
-      }
-
-      throw {
-        message: axiosError.message || 'Network error',
-        statusCode: 500,
-      } as OakApiError;
-    }
-
-    throw {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      statusCode: 500,
-    } as OakApiError;
-  }
-
-  /**
    * Check rate limit before making requests
    * Automatically resets if the reset time has passed
    */
@@ -249,10 +257,10 @@ export class OakApiService {
 
     if (this.rateLimitRemaining <= 0) {
       const resetTime = this.rateLimitReset?.toISOString() || 'unknown';
-      throw {
+      throw new OakApiRequestError({
         message: `Rate limit exceeded. Resets at ${resetTime}`,
         statusCode: 429,
-      } as OakApiError;
+      });
     }
   }
 
@@ -266,11 +274,11 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>('/key-stages');
+        const response = await this.axiosInstance.get<OakJson>('/key-stages');
         // Unwrap Oak API response: { data: [...] } -> [...]
-        return this.unwrap<KeyStage[]>(response.data);
+        return unwrap<KeyStage[]>(response.data);
       } catch (error) {
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -280,7 +288,7 @@ export class OakApiService {
    * Note: Oak API doesn't have a direct endpoint for subjects by key stage
    * We fetch all subjects and filter by key stage
    */
-  async getSubjectsByKeyStage(keyStage: string): Promise<any[]> {
+  async getSubjectsByKeyStage(keyStage: string): Promise<OakJson[]> {
     const cacheKey = `oak:keystage:${keyStage}:subjects`;
 
     return this.getCached(cacheKey, CACHE_TTL.SUBJECTS, async () => {
@@ -288,8 +296,8 @@ export class OakApiService {
 
       try {
         // Get all subjects from the Oak API
-        const response = await this.axiosInstance.get<any>('/subjects');
-        const allSubjects = this.unwrap<any[]>(response.data);
+        const response = await this.axiosInstance.get<OakJson>('/subjects');
+        const allSubjects = unwrap<OakJson[]>(response.data);
 
         // RELIABILITY FIX: Validate array before operations
         if (!allSubjects || !Array.isArray(allSubjects)) {
@@ -299,38 +307,38 @@ export class OakApiService {
 
         // Oak API now returns an array of strings for /subjects
         const slugs = allSubjects
-          .map((s: any) => (typeof s === 'string' ? s : s.subjectSlug))
+          .map((s: OakJson | string) => (typeof s === 'string' ? s : s.subjectSlug))
           .filter(Boolean);
 
         // Fetch detailed data for each subject to get keyStages mapping
         // Use Promise.all with concurrency limit or just map since the list is small (~20)
         const detailedResponses = await Promise.all(
           slugs.map((slug: string) =>
-            this.axiosInstance.get<any>(`/subjects/${slug}`).catch(() => null),
+            this.axiosInstance.get<OakJson>(`/subjects/${slug}`).catch(() => null),
           ),
         );
 
         const detailedSubjects = detailedResponses
           .filter((res) => res && res.data)
-          .map((res) => this.unwrap<any>(res!.data));
+          .map((res) => unwrap<OakJson>(res!.data));
 
         // Filter subjects that have the requested key stage in any of their sequences
         const filteredSubjects = detailedSubjects
           .filter((subject) => {
             if (!subject.sequenceSlugs) return false;
-            return subject.sequenceSlugs.some((seq: any) =>
-              seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage),
+            return subject.sequenceSlugs.some((seq: OakJson) =>
+              seq.keyStages?.some((ks: OakJson) => ks.keyStageSlug === keyStage),
             );
           })
           .map((subject) => {
             // Flatten keyStages from all sequences for the frontend
             const allKeyStages = subject.sequenceSlugs
-              ? subject.sequenceSlugs.flatMap((seq: any) => seq.keyStages || [])
+              ? subject.sequenceSlugs.flatMap((seq: OakJson) => seq.keyStages || [])
               : [];
 
             // Deduplicate keyStages by slug
             const uniqueKeyStages = Array.from(
-              new Map(allKeyStages.map((ks: any) => [ks.keyStageSlug, ks])).values(),
+              new Map(allKeyStages.map((ks: OakJson) => [ks.keyStageSlug, ks])).values(),
             );
 
             return {
@@ -340,14 +348,14 @@ export class OakApiService {
                 subject.subjectSlug.charAt(0).toUpperCase() + subject.subjectSlug.slice(1),
               keyStages: uniqueKeyStages,
               years: subject.sequenceSlugs
-                ? subject.sequenceSlugs.flatMap((seq: any) => seq.years || [])
+                ? subject.sequenceSlugs.flatMap((seq: OakJson) => seq.years || [])
                 : [],
             };
           });
 
         return filteredSubjects;
       } catch (error) {
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -357,7 +365,7 @@ export class OakApiService {
    * Note: Oak API uses sequences, not direct key stage/subject paths
    * We fetch the subject to find the matching sequence, then get units for that sequence
    */
-  async getUnits(keyStage: string, subjectSlug: string): Promise<any[]> {
+  async getUnits(keyStage: string, subjectSlug: string): Promise<OakJson[]> {
     const cacheKey = `oak:keystage:${keyStage}:subject:${subjectSlug}:units`;
 
     // Fetch the raw list (potentially from cache)
@@ -368,8 +376,8 @@ export class OakApiService {
         console.log(`[OakAPI] Fetching units for keyStage=${keyStage}, subject=${subjectSlug}`);
 
         // Step 1: Get the subject to find the appropriate sequence
-        const subjectResponse = await this.axiosInstance.get<any>(`/subjects/${subjectSlug}`);
-        const subjectData = this.unwrap<any>(subjectResponse.data);
+        const subjectResponse = await this.axiosInstance.get<OakJson>(`/subjects/${subjectSlug}`);
+        const subjectData = unwrap<OakJson>(subjectResponse.data);
 
         if (!subjectData) {
           console.warn(`[OakAPI] No subject data returned for ${subjectSlug}`);
@@ -377,12 +385,12 @@ export class OakApiService {
         }
 
         // Step 2: Find the BEST sequence for the requested key stage
-        const allSequences = subjectData.sequenceSlugs || [];
+        const allSequences: OakJson[] = subjectData.sequenceSlugs || [];
 
-        let matchingSequence: any = null;
+        let matchingSequence: OakJson | undefined;
 
         // 1. First, try to find a sequence slug that explicitly includes the key stage (e.g. 'ks3')
-        matchingSequence = allSequences.find((seq: any) => {
+        matchingSequence = allSequences.find((seq: OakJson) => {
           const seqSlug = (seq.sequenceSlug || (typeof seq === 'string' ? seq : '')).toLowerCase();
           // Match the exact key stage at the end or separated by a hyphen
           return (
@@ -393,8 +401,8 @@ export class OakApiService {
 
         // 2. Fallback to previous logic if exact match not found
         if (!matchingSequence) {
-          const candidateSequences = allSequences.filter((seq: any) =>
-            seq.keyStages?.some((ks: any) => ks.keyStageSlug === keyStage),
+          const candidateSequences = allSequences.filter((seq: OakJson) =>
+            seq.keyStages?.some((ks: OakJson) => ks.keyStageSlug === keyStage),
           );
 
           if (candidateSequences.length > 0) {
@@ -402,7 +410,7 @@ export class OakApiService {
             const isPrimaryLevel = keyStage === 'ks1' || keyStage === 'ks2';
 
             matchingSequence =
-              candidateSequences.find((seq: any) => {
+              candidateSequences.find((seq: OakJson) => {
                 const seqSlug = (seq.sequenceSlug || '').toLowerCase();
                 if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
                 if (isPrimaryLevel && seqSlug.includes('primary')) return true;
@@ -425,10 +433,10 @@ export class OakApiService {
         );
 
         // Step 3: Fetch units for this sequence
-        const unitsResponse = await this.axiosInstance.get<any>(
+        const unitsResponse = await this.axiosInstance.get<OakJson>(
           `/sequences/${sequenceSlugToUse}/units`,
         );
-        const yearlyUnits = this.unwrap<any[]>(unitsResponse.data);
+        const yearlyUnits = unwrap<OakJson[]>(unitsResponse.data);
 
         if (!yearlyUnits || !Array.isArray(yearlyUnits)) {
           return [];
@@ -442,15 +450,15 @@ export class OakApiService {
         };
 
         const yearRange = keyStageYearRanges[keyStage];
-        const allUnits: any[] = [];
+        const allUnits: OakJson[] = [];
 
         // Helper function to process units
         const processUnits = (
-          units: any[],
+          units: OakJson[],
           year: number | string,
           tier?: { slug: string; title: string },
         ) => {
-          units.forEach((unit: any) => {
+          units.forEach((unit: OakJson) => {
             if (unit.unitSlug) {
               allUnits.push({
                 ...unit,
@@ -464,7 +472,7 @@ export class OakApiService {
                 numberOfLessons: undefined,
               });
             } else if (unit.unitOptions && Array.isArray(unit.unitOptions)) {
-              unit.unitOptions.forEach((option: any, index: number) => {
+              unit.unitOptions.forEach((option: OakJson, index: number) => {
                 const baseOrder = unit.unitOrder ?? 0;
                 allUnits.push({
                   unitTitle: option.unitTitle || 'Untitled Unit',
@@ -487,9 +495,9 @@ export class OakApiService {
           });
         };
 
-        yearlyUnits.forEach((yearGroup: any) => {
+        yearlyUnits.forEach((yearGroup: OakJson) => {
           const yearNum = parseInt(yearGroup.year, 10);
-          if (yearRange && !isNaN(yearNum)) {
+          if (yearRange && !Number.isNaN(yearNum)) {
             if (yearNum < yearRange.min || yearNum > yearRange.max) return;
           }
 
@@ -498,7 +506,7 @@ export class OakApiService {
           }
 
           if (yearGroup.tiers && Array.isArray(yearGroup.tiers)) {
-            yearGroup.tiers.forEach((tierData: any) => {
+            yearGroup.tiers.forEach((tierData: OakJson) => {
               if (tierData.units && Array.isArray(tierData.units)) {
                 processUnits(tierData.units, yearGroup.year, {
                   slug: tierData.tierSlug,
@@ -509,11 +517,11 @@ export class OakApiService {
           }
 
           if (yearGroup.examSubjects && Array.isArray(yearGroup.examSubjects)) {
-            yearGroup.examSubjects.forEach((examSubject: any) => {
+            yearGroup.examSubjects.forEach((examSubject: OakJson) => {
               if (examSubject.tiers && Array.isArray(examSubject.tiers)) {
-                examSubject.tiers.forEach((tierData: any) => {
+                examSubject.tiers.forEach((tierData: OakJson) => {
                   if (tierData.units && Array.isArray(tierData.units)) {
-                    tierData.units.forEach((unit: any) => {
+                    tierData.units.forEach((unit: OakJson) => {
                       allUnits.push({
                         ...unit,
                         slug: unit.unitSlug,
@@ -533,7 +541,7 @@ export class OakApiService {
                 });
               }
               if (examSubject.units && Array.isArray(examSubject.units)) {
-                examSubject.units.forEach((unit: any) => {
+                examSubject.units.forEach((unit: OakJson) => {
                   allUnits.push({
                     ...unit,
                     slug: unit.unitSlug,
@@ -554,29 +562,24 @@ export class OakApiService {
 
         return allUnits;
       } catch (error) {
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
 
     // Step 5: Filter blocked/unavailable units and RE-INDEX
     try {
-      const filteredUnits: any[] = [];
-
-      for (const unit of rawUnits) {
+      const filteredUnits: OakJson[] = rawUnits.filter((unit: OakJson) => {
         const slug = unit.unitSlug || unit.slug;
-
         // Skip if in the static hardcoded blocklist (known broken/copyright)
-        if (BLOCKED_UNIT_SLUGS.has(slug)) continue;
-
-        filteredUnits.push(unit);
-      }
+        return !BLOCKED_UNIT_SLUGS.has(slug);
+      });
 
       console.log(
         `[OakAPI] List processed: ${rawUnits.length} raw -> ${filteredUnits.length} units for ${keyStage}/${subjectSlug}`,
       );
 
       // Re-index to ensure sequential unit numbers (1, 2, 3...)
-      return filteredUnits.map((unit: any, index: number) => ({
+      return filteredUnits.map((unit: OakJson, index: number) => ({
         ...unit,
         unitNumber: index + 1,
       }));
@@ -590,15 +593,15 @@ export class OakApiService {
    * Get unit details by slug
    * Fetches unit information from the Oak API
    */
-  async getUnitDetails(unitSlug: string): Promise<any> {
+  async getUnitDetails(unitSlug: string): Promise<OakJson> {
     const cacheKey = `oak:unit:${unitSlug}:details`;
 
     return this.getCached(cacheKey, CACHE_TTL.UNITS, async () => {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>(`/units/${unitSlug}/summary`);
-        const unitData = this.unwrap<any>(response.data);
+        const response = await this.axiosInstance.get<OakJson>(`/units/${unitSlug}/summary`);
+        const unitData = unwrap<OakJson>(response.data);
 
         // Return unit details (excluding lessons for this endpoint)
         const { unitLessons, ...unitDetails } = unitData;
@@ -609,8 +612,8 @@ export class OakApiService {
           title: unitDetails.unitTitle,
           numberOfLessons: unitLessons?.length || 0,
         };
-      } catch (error: any) {
-        return this.handleApiError(error);
+      } catch (error) {
+        return handleApiError(error);
       }
     });
   }
@@ -619,15 +622,15 @@ export class OakApiService {
    * Get lessons for a specific unit
    * Note: Oak API provides lessons via the /units/{unit}/summary endpoint
    */
-  async getLessons(unitSlug: string): Promise<any[]> {
+  async getLessons(unitSlug: string): Promise<OakJson[]> {
     const cacheKey = `oak:unit:${unitSlug}:lessons`;
 
     return this.getCached(cacheKey, CACHE_TTL.LESSONS, async () => {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>(`/units/${unitSlug}/summary`);
-        const unitData = this.unwrap<any>(response.data);
+        const response = await this.axiosInstance.get<OakJson>(`/units/${unitSlug}/summary`);
+        const unitData = unwrap<OakJson>(response.data);
 
         // RELIABILITY FIX: Validate unitData exists
         if (!unitData) {
@@ -650,18 +653,18 @@ export class OakApiService {
 
         // Filter out blocked/unavailable lessons
         const filteredLessons = lessons.filter(
-          (lesson: any) => !BLOCKED_LESSON_SLUGS.has(lesson.lessonSlug),
+          (lesson: OakJson) => !BLOCKED_LESSON_SLUGS.has(lesson.lessonSlug),
         );
 
-        return filteredLessons.map((lesson: any) => ({
+        return filteredLessons.map((lesson: OakJson) => ({
           ...lesson,
           slug: lesson.lessonSlug, // Add normalized 'slug' field for frontend compatibility
           title: lesson.lessonTitle, // Add normalized 'title' field
           subjectSlug, // Add subject info from unit for freemium logic
           keyStageSlug, // Add keystage info from unit
         }));
-      } catch (error: any) {
-        return this.handleApiError(error);
+      } catch (error) {
+        return handleApiError(error);
       }
     });
   }
@@ -670,16 +673,16 @@ export class OakApiService {
    * Get detailed information about a specific lesson
    * Normalizes Oak API field names to frontend-expected format
    */
-  async getLessonDetails(lessonSlug: string): Promise<any> {
+  async getLessonDetails(lessonSlug: string): Promise<OakJson> {
     const cacheKey = `oak:lesson:${lessonSlug}:details`;
 
     return this.getCached(cacheKey, CACHE_TTL.LESSON_DETAILS, async () => {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/summary`);
+        const response = await this.axiosInstance.get<OakJson>(`/lessons/${lessonSlug}/summary`);
         // Unwrap Oak API response: { data: {...} } -> {...}
-        const lessonData = this.unwrap<any>(response.data);
+        const lessonData = unwrap<OakJson>(response.data);
 
         // RELIABILITY FIX: Validate lessonData exists
         if (!lessonData) {
@@ -702,7 +705,7 @@ export class OakApiService {
           // Keep original fields as well for backwards compatibility
         };
       } catch (error) {
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -722,11 +725,11 @@ export class OakApiService {
         this.checkRateLimit();
 
         try {
-          const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/video`);
+          const response = await this.axiosInstance.get<OakJson>(`/lessons/${lessonSlug}/video`);
           // Unwrap Oak API response: { data: {...} } -> {...}
-          return this.unwrap<Video>(response.data);
+          return unwrap<Video>(response.data);
         } catch (error) {
-          return this.handleApiError(error);
+          return handleApiError(error);
         }
       },
       true, // Skip cache
@@ -744,15 +747,15 @@ export class OakApiService {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/quiz`);
+        const response = await this.axiosInstance.get<OakJson>(`/lessons/${lessonSlug}/quiz`);
         // Unwrap Oak API response: { data: { starterQuiz: [...], exitQuiz: [...] } }
-        const quizData = this.unwrap<any>(response.data);
+        const quizData = unwrap<OakJson>(response.data);
         return {
           starterQuiz: quizData.starterQuiz || [],
           exitQuiz: quizData.exitQuiz || [],
         };
       } catch (error) {
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -762,33 +765,33 @@ export class OakApiService {
    * Rewrites Oak API URLs to use our backend proxy
    * Note: Not all lessons have assets - returns empty array for 404
    */
-  async getLessonAssets(lessonSlug: string, backendBaseUrl: string = ''): Promise<any> {
+  async getLessonAssets(lessonSlug: string, backendBaseUrl: string = ''): Promise<OakJson> {
     const cacheKey = `oak:lesson:${lessonSlug}:assets`;
 
     return this.getCached(cacheKey, CACHE_TTL.LESSON_DETAILS, async () => {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/assets`);
+        const response = await this.axiosInstance.get<OakJson>(`/lessons/${lessonSlug}/assets`);
         const { data } = response;
 
         // Rewrite all Oak API URLs to use our backend proxy.
         // Video must go through the proxy because Oak API requires Authorization headers.
         // All assets (video, PDF, slides) are rewritten to our authenticated backend URL.
         if (data.assets && Array.isArray(data.assets)) {
-          data.assets = data.assets.map((asset: any) => ({
+          data.assets = data.assets.map((asset: OakJson) => ({
             ...asset,
             url: `${backendBaseUrl}/api/v1/oak/lessons/${lessonSlug}/assets/${asset.type}`,
           }));
         }
 
         return data;
-      } catch (error: any) {
+      } catch (error) {
         // Handle 404 gracefully - some lessons don't have assets
         if (axios.isAxiosError(error) && error.response?.status === 404) {
           return { assets: [], message: 'No assets available for this lesson' };
         }
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -804,7 +807,7 @@ export class OakApiService {
     assetType: string,
     range?: string,
   ): Promise<{
-    stream: any;
+    stream: Readable;
     contentType: string;
     contentDisposition?: string;
     contentLength?: string;
@@ -842,19 +845,19 @@ export class OakApiService {
       // Handle 404
       if (response.status === 404) {
         response.data.destroy();
-        throw {
+        throw new OakApiRequestError({
           message: `Asset '${assetType}' not available for this lesson`,
           statusCode: 404,
-        } as OakApiError;
+        });
       }
 
       // Handle other client errors
       if (response.status >= 400) {
         response.data.destroy();
-        throw {
+        throw new OakApiRequestError({
           message: `Oak API error: ${response.status}`,
           statusCode: response.status,
-        } as OakApiError;
+        });
       }
 
       // Success - return the stream
@@ -871,20 +874,19 @@ export class OakApiService {
         contentRange: response.headers['content-range'],
         status: response.status,
       };
-    } catch (error: any) {
+    } catch (error) {
       // Handle 404 specifically
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        throw {
+        throw new OakApiRequestError({
           message: `Asset '${assetType}' not available for this lesson`,
           statusCode: 404,
-        } as OakApiError;
+        });
       }
 
-      console.error(`[oakApiService] Asset stream error for ${assetType}:`, error.message);
-      throw {
-        message: error.message || 'Network error',
-        statusCode: error.response?.status || 500,
-      } as OakApiError;
+      const message = error instanceof Error ? error.message : 'Network error';
+      const statusCode = (axios.isAxiosError(error) && error.response?.status) || 500;
+      console.error(`[oakApiService] Asset stream error for ${assetType}:`, message);
+      throw new OakApiRequestError({ message, statusCode });
     }
   }
 
@@ -892,16 +894,16 @@ export class OakApiService {
    * Get lesson transcript
    * Note: Not all lessons have transcripts - returns null for 404
    */
-  async getLessonTranscript(lessonSlug: string): Promise<any> {
+  async getLessonTranscript(lessonSlug: string): Promise<OakJson> {
     const cacheKey = `oak:lesson:${lessonSlug}:transcript`;
 
     return this.getCached(cacheKey, CACHE_TTL.LESSON_DETAILS, async () => {
       this.checkRateLimit();
 
       try {
-        const response = await this.axiosInstance.get<any>(`/lessons/${lessonSlug}/transcript`);
-        return this.unwrap<any>(response.data);
-      } catch (error: any) {
+        const response = await this.axiosInstance.get<OakJson>(`/lessons/${lessonSlug}/transcript`);
+        return unwrap<OakJson>(response.data);
+      } catch (error) {
         // Handle 404 gracefully - some lessons don't have transcripts
         if (axios.isAxiosError(error) && error.response?.status === 404) {
           return {
@@ -910,7 +912,7 @@ export class OakApiService {
             message: 'No transcript available for this lesson',
           };
         }
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -938,19 +940,19 @@ export class OakApiService {
         if (subjectSlug) params.subject = subjectSlug;
         if (yearSlug) params.year = yearSlug;
 
-        const response = await this.axiosInstance.get<any>('/lessons/search', {
+        const response = await this.axiosInstance.get<OakJson>('/lessons/search', {
           params,
         });
 
-        const searchResults = this.unwrap<any>(response.data);
+        const searchResults = unwrap<SearchResults<Lesson> & OakJson>(response.data);
 
         // Filter out blocked lessons and units
         if (searchResults && Array.isArray(searchResults.data)) {
-          searchResults.data = searchResults.data.filter((lesson: any) => {
-            const lessonSlug = lesson.lessonSlug || lesson.slug;
+          searchResults.data = searchResults.data.filter((lesson: OakJson) => {
+            const lessonResultSlug = lesson.lessonSlug || lesson.slug;
             const { unitSlug } = lesson;
 
-            if (lessonSlug && BLOCKED_LESSON_SLUGS.has(lessonSlug)) return false;
+            if (lessonResultSlug && BLOCKED_LESSON_SLUGS.has(lessonResultSlug)) return false;
             if (unitSlug && BLOCKED_UNIT_SLUGS.has(unitSlug)) return false;
 
             return true;
@@ -959,7 +961,7 @@ export class OakApiService {
 
         return searchResults;
       } catch (error) {
-        return this.handleApiError(error);
+        return handleApiError(error);
       }
     });
   }
@@ -975,11 +977,14 @@ export class OakApiService {
       if (keys.length === 0) {
         return 0;
       }
-      // Delete keys in batches to avoid Redis limits
+      // Delete keys in batches to avoid Redis limits. Sequential (not
+      // Promise.all) on purpose - this deliberately throttles delete
+      // throughput rather than firing all batches at Redis at once.
       let totalDeleted = 0;
       const batchSize = 100;
       for (let i = 0; i < keys.length; i += batchSize) {
         const batch = keys.slice(i, i + batchSize);
+        // eslint-disable-next-line no-await-in-loop
         const deleted = await this.redis.del(...batch);
         totalDeleted += deleted;
       }
