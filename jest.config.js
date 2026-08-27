@@ -16,7 +16,6 @@ module.exports = {
   // --- New additions for end-to-end testing ---
   // Where Jest should look for test files
   testMatch: [
-    "**/tests/**/*.ts",
     "**/?(*.)+(spec|test).ts"
   ],
   // Ignore the 'dist' directory

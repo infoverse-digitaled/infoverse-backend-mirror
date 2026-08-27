@@ -12,10 +12,18 @@ steps:
     entrypoint: npx
     args:
       - 'jest'
-      # factories.test.ts is excluded here: it spins up mongodb-memory-server,
-      # which downloads a ~590MB binary on a cold cache and is too slow/flaky
-      # to gate a deploy on. Covered by test:all locally instead.
-      - '--testPathIgnorePatterns=integration|factories\.test\.ts'
+      # Excluded here, all for the same reason - they need live infrastructure
+      # (a real MongoDB, full .env-sourced config) this fast pre-build gate
+      # doesn't provision, so they'd fail here regardless of code correctness:
+      #  - factories.test.ts: spins up mongodb-memory-server, which downloads
+      #    a ~590MB binary on a cold cache.
+      #  - tests/app.test.ts, course.test.ts: boot the full Express app
+      #    (real Mongo connection, JWT_SECRET/MONGO_URI etc. from .env, which
+      #    only ts-node's `-r dotenv/config` loads - plain `jest` does not).
+      # Covered by `npm run test:all` against a provisioned environment
+      # instead. TODO: stand up a real integration-test lane (Mongo service +
+      # injected secrets) rather than growing this exclusion list further.
+      - '--testPathIgnorePatterns=integration|factories\.test\.ts|src[\\/]tests[\\/]app\.test\.ts|src[\\/]course\.test\.ts'
 
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
