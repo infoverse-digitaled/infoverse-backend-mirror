@@ -26,39 +26,53 @@ export const getMyProgress = async (req: Request, res: Response, next: NextFunct
     // Get all enrollments for this user
     const enrollments = await OakEnrollment.find({ userId: user.id }).sort({ lastAccessedAt: -1 });
 
-    // Get progress for each enrollment
-    const enrollmentsWithProgress = await Promise.all(
-      enrollments.map(async (enrollment) => {
-        const progressRecords = await Progress.find({ enrollmentId: enrollment._id });
+    // Fetch progress for ALL enrollments in a single query (was one query per
+    // enrollment via Promise.all - this endpoint is hit on every dashboard/
+    // browse page load, so N+1 here means N+1 per concurrent user).
+    const enrollmentIds = enrollments.map((e) => e._id);
+    const allProgress = await Progress.find({ enrollmentId: { $in: enrollmentIds } });
 
-        // Calculate overall progress
-        const totalLessons = progressRecords.length;
-        const completedLessons = progressRecords.filter((p) => p.status === 'completed').length;
-        const progressPercent =
-          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+    const progressByEnrollment = allProgress.reduce((map, record) => {
+      const key = record.enrollmentId.toString();
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(record);
+      } else {
+        map.set(key, [record]);
+      }
+      return map;
+    }, new Map<string, typeof allProgress>());
 
-        return {
-          _id: enrollment._id,
-          subjectSlug: enrollment.subjectSlug,
-          keyStage: enrollment.keyStage,
-          status: enrollment.status,
-          startDate: enrollment.startDate,
-          lastAccessedAt: enrollment.lastAccessedAt,
-          progress: {
-            totalLessons,
-            completedLessons,
-            progressPercent,
-            lessons: progressRecords.map((p) => ({
-              lessonSlug: p.lessonSlug,
-              unitSlug: p.unitSlug,
-              status: p.status,
-              quizScore: p.quizScore,
-              completedAt: p.completedAt,
-            })),
-          },
-        };
-      }),
-    );
+    const enrollmentsWithProgress = enrollments.map((enrollment) => {
+      const progressRecords = progressByEnrollment.get(enrollment._id.toString()) || [];
+
+      // Calculate overall progress
+      const totalLessons = progressRecords.length;
+      const completedLessons = progressRecords.filter((p) => p.status === 'completed').length;
+      const progressPercent =
+        totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+      return {
+        _id: enrollment._id,
+        subjectSlug: enrollment.subjectSlug,
+        keyStage: enrollment.keyStage,
+        status: enrollment.status,
+        startDate: enrollment.startDate,
+        lastAccessedAt: enrollment.lastAccessedAt,
+        progress: {
+          totalLessons,
+          completedLessons,
+          progressPercent,
+          lessons: progressRecords.map((p) => ({
+            lessonSlug: p.lessonSlug,
+            unitSlug: p.unitSlug,
+            status: p.status,
+            quizScore: p.quizScore,
+            completedAt: p.completedAt,
+          })),
+        },
+      };
+    });
 
     return successResponse(res, enrollmentsWithProgress, 'Progress retrieved successfully');
   } catch (error) {
