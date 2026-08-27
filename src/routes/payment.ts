@@ -1,5 +1,13 @@
 import { Router } from 'express';
-import { startTrial, verifyTrial, getPricing, initializePayment, verifyPayment, getPlans, cancelUserSubscription } from '../controllers/paymentController';
+import {
+  startTrial,
+  verifyTrial,
+  getPricing,
+  initializePayment,
+  verifyPayment,
+  getPlans,
+  cancelUserSubscription,
+} from '../controllers/paymentController';
 import { handleWebhook } from '../controllers/webhookController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 
@@ -157,4 +165,3 @@ router.post('/verify', authenticateJWT, verifyPayment);
 router.post('/cancel', authenticateJWT, cancelUserSubscription);
 
 export default router;
-

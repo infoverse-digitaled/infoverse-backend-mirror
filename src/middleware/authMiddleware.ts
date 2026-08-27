@@ -60,7 +60,13 @@ export const authenticateJWT: RequestHandler = async (req, res, next) => {
       subscription: user.subscription
         ? {
             plan: user.subscription.plan as 'free' | 'premium',
-            status: user.subscription.status as 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due' | 'free',
+            status: user.subscription.status as
+              | 'active'
+              | 'inactive'
+              | 'cancelled'
+              | 'trialing'
+              | 'past_due'
+              | 'free',
             expiresAt: user.subscription.expiresAt,
             trialEndsAt: user.subscription.trialEndsAt,
           }
@@ -71,7 +77,6 @@ export const authenticateJWT: RequestHandler = async (req, res, next) => {
     res.status(401).json({
       error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token. Please log in again.' },
     });
-    return;
   }
 };
 
@@ -80,7 +85,7 @@ export const authenticateJWT: RequestHandler = async (req, res, next) => {
  * Blocks access if trial has expired and user hasn't paid
  */
 export const requireActiveSubscription: RequestHandler = async (req, res, next) => {
-  const user = (req as AuthenticatedRequest).user;
+  const { user } = req as AuthenticatedRequest;
 
   if (!user) {
     res.status(401).json({
@@ -89,7 +94,7 @@ export const requireActiveSubscription: RequestHandler = async (req, res, next) 
     return;
   }
 
-  const subscription = user.subscription;
+  const { subscription } = user;
 
   // No subscription at all - block
   if (!subscription) {
@@ -164,7 +169,13 @@ export const optionalAuth: RequestHandler = async (req, res, next) => {
         subscription: user.subscription
           ? {
               plan: user.subscription.plan as 'free' | 'premium',
-              status: user.subscription.status as 'active' | 'inactive' | 'cancelled' | 'trialing' | 'past_due' | 'free',
+              status: user.subscription.status as
+                | 'active'
+                | 'inactive'
+                | 'cancelled'
+                | 'trialing'
+                | 'past_due'
+                | 'free',
               expiresAt: user.subscription.expiresAt,
               trialEndsAt: user.subscription.trialEndsAt,
             }
@@ -184,7 +195,7 @@ export const optionalAuth: RequestHandler = async (req, res, next) => {
 export const checkRole = (...roles: string[]): RequestHandler => {
   return (req, res, next) => {
     const userRole = (req as AuthenticatedRequest).user?.role;
-    
+
     if (!userRole) {
       res.status(401).json({
         error: { code: 'UNAUTHORIZED', message: 'User role not found' },

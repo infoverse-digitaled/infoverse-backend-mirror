@@ -15,11 +15,16 @@ import {
   clearKeyStageCache,
   clearAllCache,
 } from '../controllers/oakContentController';
-import { optionalAuth, authenticateJWT, requireActiveSubscription, AuthenticatedRequest } from '../middleware/authMiddleware';
+import {
+  optionalAuth,
+  authenticateJWT,
+  requireActiveSubscription,
+  AuthenticatedRequest,
+} from '../middleware/authMiddleware';
 
 // Admin check middleware
 const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  const user = (req as AuthenticatedRequest).user;
+  const { user } = req as AuthenticatedRequest;
   if (!user || user.role !== 'admin') {
     res.status(403).json({
       error: { code: 'FORBIDDEN', message: 'Admin access required' },
@@ -253,7 +258,12 @@ router.get('/lessons/:lessonSlug/quiz', authenticateJWT, requireActiveSubscripti
  *       403:
  *         description: Active subscription required
  */
-router.get('/lessons/:lessonSlug/assets', authenticateJWT, requireActiveSubscription, getLessonAssets);
+router.get(
+  '/lessons/:lessonSlug/assets',
+  authenticateJWT,
+  requireActiveSubscription,
+  getLessonAssets,
+);
 
 // Asset file routes with OPTIONS preflight support for CORS
 // setAssetCORPHeaders runs FIRST to ensure CORP headers on ALL responses (including 401/403 errors)
@@ -289,7 +299,13 @@ router.options('/lessons/:lessonSlug/assets/:assetType', handleAssetPreflight);
  *       403:
  *         description: Active subscription required
  */
-router.get('/lessons/:lessonSlug/assets/:assetType', setAssetCORPHeaders, authenticateJWT, requireActiveSubscription, getAssetFile);
+router.get(
+  '/lessons/:lessonSlug/assets/:assetType',
+  setAssetCORPHeaders,
+  authenticateJWT,
+  requireActiveSubscription,
+  getAssetFile,
+);
 
 /**
  * @swagger
@@ -314,7 +330,12 @@ router.get('/lessons/:lessonSlug/assets/:assetType', setAssetCORPHeaders, authen
  *       403:
  *         description: Active subscription required
  */
-router.get('/lessons/:lessonSlug/transcript', authenticateJWT, requireActiveSubscription, getLessonTranscript);
+router.get(
+  '/lessons/:lessonSlug/transcript',
+  authenticateJWT,
+  requireActiveSubscription,
+  getLessonTranscript,
+);
 
 // Admin routes for cache management
 

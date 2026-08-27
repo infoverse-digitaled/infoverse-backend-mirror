@@ -378,14 +378,17 @@ export class OakApiService {
 
         // Step 2: Find the BEST sequence for the requested key stage
         const allSequences = subjectData.sequenceSlugs || [];
-        
+
         let matchingSequence: any = null;
 
         // 1. First, try to find a sequence slug that explicitly includes the key stage (e.g. 'ks3')
         matchingSequence = allSequences.find((seq: any) => {
           const seqSlug = (seq.sequenceSlug || (typeof seq === 'string' ? seq : '')).toLowerCase();
           // Match the exact key stage at the end or separated by a hyphen
-          return seqSlug.includes(`-${keyStage.toLowerCase()}`) || seqSlug.endsWith(keyStage.toLowerCase());
+          return (
+            seqSlug.includes(`-${keyStage.toLowerCase()}`) ||
+            seqSlug.endsWith(keyStage.toLowerCase())
+          );
         });
 
         // 2. Fallback to previous logic if exact match not found
@@ -398,12 +401,13 @@ export class OakApiService {
             const isSecondaryLevel = keyStage === 'ks3' || keyStage === 'ks4';
             const isPrimaryLevel = keyStage === 'ks1' || keyStage === 'ks2';
 
-            matchingSequence = candidateSequences.find((seq: any) => {
-              const seqSlug = (seq.sequenceSlug || '').toLowerCase();
-              if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
-              if (isPrimaryLevel && seqSlug.includes('primary')) return true;
-              return false;
-            }) || candidateSequences[0];
+            matchingSequence =
+              candidateSequences.find((seq: any) => {
+                const seqSlug = (seq.sequenceSlug || '').toLowerCase();
+                if (isSecondaryLevel && seqSlug.includes('secondary')) return true;
+                if (isPrimaryLevel && seqSlug.includes('primary')) return true;
+                return false;
+              }) || candidateSequences[0];
           }
         }
 
@@ -646,7 +650,7 @@ export class OakApiService {
 
         // Filter out blocked/unavailable lessons
         const filteredLessons = lessons.filter(
-          (lesson: any) => !BLOCKED_LESSON_SLUGS.has(lesson.lessonSlug)
+          (lesson: any) => !BLOCKED_LESSON_SLUGS.has(lesson.lessonSlug),
         );
 
         return filteredLessons.map((lesson: any) => ({
@@ -944,11 +948,11 @@ export class OakApiService {
         if (searchResults && Array.isArray(searchResults.data)) {
           searchResults.data = searchResults.data.filter((lesson: any) => {
             const lessonSlug = lesson.lessonSlug || lesson.slug;
-            const unitSlug = lesson.unitSlug;
-            
+            const { unitSlug } = lesson;
+
             if (lessonSlug && BLOCKED_LESSON_SLUGS.has(lessonSlug)) return false;
             if (unitSlug && BLOCKED_UNIT_SLUGS.has(unitSlug)) return false;
-            
+
             return true;
           });
         }

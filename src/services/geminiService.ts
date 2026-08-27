@@ -27,7 +27,7 @@ const RATE_WINDOW = 60 * 1000; // 1 minute in ms
 const executeWithBackoff = async <T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 2000
+  baseDelay: number = 2000,
 ): Promise<T> => {
   let attempt = 0;
   while (attempt < maxRetries) {
@@ -35,21 +35,26 @@ const executeWithBackoff = async <T>(
       return await operation();
     } catch (error: any) {
       attempt++;
-      
+
       // We only want to retry on specific transient errors (429 Rate Limit, 503 Unavaiable)
       // If error is something else, or we're on the last attempt, immediately throw
-      if (attempt >= maxRetries || (error.status && error.status !== 429 && error.status !== 500 && error.status !== 503)) {
+      if (
+        attempt >= maxRetries ||
+        (error.status && error.status !== 429 && error.status !== 500 && error.status !== 503)
+      ) {
         throw error;
       }
-      
+
       // Calculate delay: baseDelay * 2^(attempt - 1)
-      const delay = baseDelay * Math.pow(2, attempt - 1);
-      logger.warn(`[Gemini] API request failed. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`);
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
+      const delay = baseDelay * 2 ** (attempt - 1);
+      logger.warn(
+        `[Gemini] API request failed. Retrying in ${delay}ms... (Attempt ${attempt}/${maxRetries})`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  throw new Error("Exponential backoff failed");
+  throw new Error('Exponential backoff failed');
 };
 
 /**
@@ -79,11 +84,15 @@ export const checkRateLimit = (userId: string): boolean => {
 export const askTutor = async (
   context: string,
   question: string,
-  userId: string
+  userId: string,
 ): Promise<string> => {
   // Check rate limit
   if (!checkRateLimit(userId)) {
-    throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Too many requests. Please try again in a minute.');
+    throw new HttpError(
+      429,
+      'RATE_LIMIT_EXCEEDED',
+      'Too many requests. Please try again in a minute.',
+    );
   }
 
   try {
@@ -131,7 +140,7 @@ Please answer the student's question:`;
       causeCode: error?.cause?.code,
       errno: error?.cause?.errno,
       syscall: error?.cause?.syscall,
-      stack: error?.stack?.split('\n').slice(0, 5).join('\n')
+      stack: error?.stack?.split('\n').slice(0, 5).join('\n'),
     });
     throw new HttpError(500, 'AI_ERROR', 'Failed to generate AI response. Please try again.');
   }
@@ -140,13 +149,14 @@ Please answer the student's question:`;
 /**
  * Generate a summary of lesson content
  */
-export const generateSummary = async (
-  content: string,
-  userId: string
-): Promise<string> => {
+export const generateSummary = async (content: string, userId: string): Promise<string> => {
   // Check rate limit
   if (!checkRateLimit(userId)) {
-    throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Too many requests. Please try again in a minute.');
+    throw new HttpError(
+      429,
+      'RATE_LIMIT_EXCEEDED',
+      'Too many requests. Please try again in a minute.',
+    );
   }
 
   try {
@@ -191,11 +201,15 @@ Generate a summary:`;
 export const explainSimply = async (
   concept: string,
   context: string,
-  userId: string
+  userId: string,
 ): Promise<string> => {
   // Check rate limit
   if (!checkRateLimit(userId)) {
-    throw new HttpError(429, 'RATE_LIMIT_EXCEEDED', 'Too many requests. Please try again in a minute.');
+    throw new HttpError(
+      429,
+      'RATE_LIMIT_EXCEEDED',
+      'Too many requests. Please try again in a minute.',
+    );
   }
 
   try {

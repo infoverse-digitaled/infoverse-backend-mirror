@@ -1,10 +1,6 @@
 import { Router } from 'express';
 import { param } from 'express-validator';
-import {
-  getCourseReviews,
-  postReview,
-  deleteOwnReview,
-} from '../controllers/reviewController';
+import { getCourseReviews, postReview, deleteOwnReview } from '../controllers/reviewController';
 import { authenticateJWT } from '../middleware/authMiddleware';
 import { isStudent } from '../middleware/roles/isStudent';
 import { reviewValidationRules } from '../middleware/validators/reviewValidators';
@@ -114,17 +110,8 @@ const router = Router();
  */
 router
   .route('/:courseId/reviews')
-  .get(
-    validateRequest,
-    getCourseReviews
-  )
-  .post(
-    authenticateJWT,
-    isStudent,
-    reviewValidationRules,
-    validateRequest,
-    postReview
-  );
+  .get(validateRequest, getCourseReviews)
+  .post(authenticateJWT, isStudent, reviewValidationRules, validateRequest, postReview);
 
 /**
  * @swagger
@@ -138,7 +125,7 @@ router
  *       - in: path
  *         name: courseId
  *         required: true
- *         schema: 
+ *         schema:
  *           type: string
  *         description: The ID of the course (for route consistency)
  *       - in: path
@@ -161,9 +148,7 @@ router.delete(
   '/:courseId/reviews/:reviewId',
   authenticateJWT,
   isStudent,
-  [
-    param('courseId').isMongoId().withMessage('Invalid course ID format'),
-  ],
+  [param('courseId').isMongoId().withMessage('Invalid course ID format')],
   validateRequest,
   deleteOwnReview,
 );

@@ -88,8 +88,7 @@ export const getPostBySlug = async (req: Request, res: Response, next: NextFunct
       }
     }
 
-    const post = await BlogPost.findOne({ slug, published: true })
-      .populate('author', 'name');
+    const post = await BlogPost.findOne({ slug, published: true }).populate('author', 'name');
 
     if (!post) {
       throw new HttpError(404, 'POST_NOT_FOUND', 'Post not found.');

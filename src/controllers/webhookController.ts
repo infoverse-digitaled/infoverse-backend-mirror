@@ -10,9 +10,7 @@ import { PAYSTACK_PLANS } from '../config/paystack';
  */
 const resolvePlanName = (planCode: string | undefined): string => {
   if (!planCode) return 'premium';
-  const entry = Object.entries(PAYSTACK_PLANS).find(
-    ([, p]) => (p as any).code === planCode
-  );
+  const entry = Object.entries(PAYSTACK_PLANS).find(([, p]) => (p as any).code === planCode);
   // e.g. 'INDIVIDUAL_DAILY' → 'individual_daily'
   return entry ? entry[0].toLowerCase() : 'premium';
 };
@@ -61,7 +59,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
         const subscriptionCode: string | undefined = event.data.subscription_code;
         const planName = resolvePlanName(planCode);
         console.log(
-          `[Webhook] subscription.create for ${email} — plan: ${planName}, code: ${subscriptionCode}`
+          `[Webhook] subscription.create for ${email} — plan: ${planName}, code: ${subscriptionCode}`,
         );
         await User.findByIdAndUpdate(user._id, {
           'subscription.status': 'active',

@@ -6,7 +6,17 @@
  */
 
 import { Router } from 'express';
-import { register, login, googleLogin, forgotPassword, resetPassword, getMe, completeOnboarding, updateProfile, changePassword } from '../controllers/authController';
+import {
+  register,
+  login,
+  googleLogin,
+  forgotPassword,
+  resetPassword,
+  getMe,
+  completeOnboarding,
+  updateProfile,
+  changePassword,
+} from '../controllers/authController';
 import {
   loginValidationRules,
   signupValidationRules,
@@ -120,7 +130,8 @@ router.post(
   authLimiter,
   forgotPasswordValidationRules,
   validateRequest,
-  forgotPassword);
+  forgotPassword,
+);
 /**
  * @swagger
  * /api/v1/auth/reset-password/{token}:
@@ -151,7 +162,8 @@ router.patch(
   authLimiter,
   resetPasswordValidationRules,
   validateRequest,
-  resetPassword);
+  resetPassword,
+);
 
 /**
  * @swagger
@@ -192,7 +204,13 @@ router.get('/me', authenticateJWT, getMe);
  *       401:
  *         description: User not authenticated
  */
-router.patch('/onboarding', authenticateJWT, onboardingValidationRules, validateRequest, completeOnboarding);
+router.patch(
+  '/onboarding',
+  authenticateJWT,
+  onboardingValidationRules,
+  validateRequest,
+  completeOnboarding,
+);
 
 /**
  * @swagger
@@ -216,7 +234,13 @@ router.patch('/onboarding', authenticateJWT, onboardingValidationRules, validate
  *       401:
  *         description: User not authenticated
  */
-router.patch('/profile', authenticateJWT, updateProfileValidationRules, validateRequest, updateProfile);
+router.patch(
+  '/profile',
+  authenticateJWT,
+  updateProfileValidationRules,
+  validateRequest,
+  updateProfile,
+);
 
 /**
  * @swagger
@@ -241,6 +265,12 @@ router.patch('/profile', authenticateJWT, updateProfileValidationRules, validate
  *       401:
  *         description: Current password is incorrect
  */
-router.patch('/change-password', authenticateJWT, changePasswordValidationRules, validateRequest, changePassword);
+router.patch(
+  '/change-password',
+  authenticateJWT,
+  changePasswordValidationRules,
+  validateRequest,
+  changePassword,
+);
 
 export default router;

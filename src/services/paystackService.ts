@@ -21,7 +21,7 @@ export const initializeCardValidation = async (email: string, planCode: string) 
       },
       {
         headers: getHeaders(),
-      }
+      },
     );
 
     return response.data;
@@ -57,20 +57,15 @@ export const initializePayment = async (
       payload.plan = planCode;
     }
 
-    const response = await axios.post(
-      `${PAYSTACK_BASE_URL}/transaction/initialize`,
-      payload,
-      {
-        headers: getHeaders(),
-      }
-    );
+    const response = await axios.post(`${PAYSTACK_BASE_URL}/transaction/initialize`, payload, {
+      headers: getHeaders(),
+    });
 
     return response.data;
   } catch (error) {
     throw error;
   }
 };
-
 
 /**
  * Disable (cancel) an existing Paystack subscription so the customer is not
@@ -86,15 +81,16 @@ export const initializePayment = async (
 export const cancelSubscription = async (subscriptionCode: string): Promise<void> => {
   try {
     // 1. Fetch subscription details to get the email_token
-    const detailsRes = await axios.get(
-      `${PAYSTACK_BASE_URL}/subscription/${subscriptionCode}`,
-      { headers: getHeaders() }
-    );
+    const detailsRes = await axios.get(`${PAYSTACK_BASE_URL}/subscription/${subscriptionCode}`, {
+      headers: getHeaders(),
+    });
 
     const emailToken: string | undefined = detailsRes.data?.data?.email_token;
 
     if (!emailToken) {
-      console.warn(`[Paystack] No email_token found for subscription ${subscriptionCode} — skipping cancel`);
+      console.warn(
+        `[Paystack] No email_token found for subscription ${subscriptionCode} — skipping cancel`,
+      );
       return;
     }
 
@@ -102,7 +98,7 @@ export const cancelSubscription = async (subscriptionCode: string): Promise<void
     await axios.post(
       `${PAYSTACK_BASE_URL}/subscription/disable`,
       { code: subscriptionCode, token: emailToken },
-      { headers: getHeaders() }
+      { headers: getHeaders() },
     );
 
     console.log(`[Paystack] Subscription ${subscriptionCode} disabled successfully`);
@@ -110,21 +106,17 @@ export const cancelSubscription = async (subscriptionCode: string): Promise<void
     // Non-fatal — log and continue so the new payment can still proceed
     console.warn(
       `[Paystack] Failed to cancel subscription ${subscriptionCode}:`,
-      error?.response?.data || error?.message
+      error?.response?.data || error?.message,
     );
   }
 };
 
-
 export const verifyAndCreateTrial = async (reference: string) => {
   try {
     // 1. Verify Transaction
-    const verifyResponse = await axios.get(
-      `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
-      {
-        headers: getHeaders(),
-      }
-    );
+    const verifyResponse = await axios.get(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
+      headers: getHeaders(),
+    });
 
     const transactionData = verifyResponse.data.data;
 
@@ -153,7 +145,7 @@ export const verifyAndCreateTrial = async (reference: string) => {
       },
       {
         headers: getHeaders(),
-      }
+      },
     );
 
     return subscriptionResponse.data;
@@ -167,12 +159,9 @@ export const verifyAndCreateTrial = async (reference: string) => {
  */
 export const verifyPayment = async (reference: string) => {
   try {
-    const verifyResponse = await axios.get(
-      `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
-      {
-        headers: getHeaders(),
-      }
-    );
+    const verifyResponse = await axios.get(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
+      headers: getHeaders(),
+    });
 
     const transactionData = verifyResponse.data.data;
 

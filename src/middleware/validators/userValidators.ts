@@ -8,11 +8,7 @@ export const userUpdateValidationRules = [
     .notEmpty()
     .withMessage('Email cannot be empty')
     .trim(),
-  body('name')
-    .optional()
-    .notEmpty()
-    .withMessage('Name cannot be empty')
-    .trim(),
+  body('name').optional().notEmpty().withMessage('Name cannot be empty').trim(),
   body('currentPassword')
     .if(body('newPassword').exists({ checkFalsy: true }))
     .notEmpty()

@@ -18,10 +18,9 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
   // Handle OakApiError and similar errors with statusCode
   if (err.statusCode && typeof err.statusCode === 'number') {
-    const statusCode = err.statusCode;
-    const code = statusCode === 404 ? 'NOT_FOUND' :
-                 statusCode === 429 ? 'RATE_LIMIT_EXCEEDED' :
-                 'API_ERROR';
+    const { statusCode } = err;
+    const code =
+      statusCode === 404 ? 'NOT_FOUND' : statusCode === 429 ? 'RATE_LIMIT_EXCEEDED' : 'API_ERROR';
     return res.status(statusCode).json({
       success: false,
       error: {
@@ -37,7 +36,8 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
       success: false,
       error: {
         code: 'SERVICE_UNAVAILABLE',
-        message: 'The server is currently unable to connect to the database. Please try again in a few minutes.',
+        message:
+          'The server is currently unable to connect to the database. Please try again in a few minutes.',
       },
     });
   }

@@ -1,10 +1,6 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import {
-  createTestUser,
-  createTestOakEnrollment,
-  createTestProgress,
-} from './utils/factories';
+import { createTestUser, createTestOakEnrollment, createTestProgress } from './utils/factories';
 import User from '../models/User';
 import OakEnrollment from '../models/OakEnrollment';
 import Progress from '../models/Progress';
@@ -26,7 +22,7 @@ afterAll(async () => {
 
 // Clear all test data after each test
 afterEach(async () => {
-  const collections = mongoose.connection.collections;
+  const { collections } = mongoose.connection;
   for (const key in collections) {
     const collection = collections[key];
     await collection.deleteMany({});
@@ -108,8 +104,8 @@ describe('Test Data Factories', () => {
 
     // Create a progress record for that specific enrollment.
     const { progress } = await createTestProgress(enrollment, user, {
-        lessonSlug: 'my-specific-lesson',
-        status: 'completed'
+      lessonSlug: 'my-specific-lesson',
+      status: 'completed',
     });
 
     expect(progress.lessonSlug).toBe('my-specific-lesson');

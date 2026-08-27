@@ -1,7 +1,6 @@
 import { Worker } from 'bullmq';
 import { redisConnection } from './utils/emailQueue';
 
-
 // Generic email sending function
 const sendEmail = async (to: string, subject: string, text: string) => {
   console.log(`WORKER: Sending email to ${to}...`);

@@ -15,7 +15,6 @@
  */
 
 export const BLOCKED_UNIT_SLUGS = new Set<string>([
-
   // --- COMPUTING PRIMARY ---
   'digital-writing', // Unit 2
   'creating-animations-in-programs', // Unit 3
@@ -68,44 +67,44 @@ export const BLOCKED_UNIT_SLUGS = new Set<string>([
   'a-world-at-war-short-stories',
   'small-island',
   'simon-armitage-writing-your-world',
-  'modern-text-first-study-5139',   // AQA: Animal Farm
-  'modern-text-first-study-5140',   // Edexcel: Animal Farm
-  'modern-text-first-study-4896',   // AQA/Edexcel/Eduqas: An Inspector Calls
-  'modern-text-first-study-198',    // AQA: Leave Taking
-  'modern-text-first-study-1718',   // Eduqas: Leave Taking
-  'poetry-anthology-first-study-201',   // AQA: Love & Relationships
-  'poetry-anthology-first-study-155',   // AQA: Power & Conflict
-  'poetry-anthology-first-study-199',   // AQA: World & Lives
-  'poetry-anthology-first-study-203',   // Edexcel: Belonging
-  'poetry-anthology-first-study-202',   // Edexcel: Conflict
-  'poetry-anthology-first-study-5071',  // Eduqas: Anthology 2027
-  'poetry-anthology-first-study-1482',  // Eduqas: Anthology 2026
+  'modern-text-first-study-5139', // AQA: Animal Farm
+  'modern-text-first-study-5140', // Edexcel: Animal Farm
+  'modern-text-first-study-4896', // AQA/Edexcel/Eduqas: An Inspector Calls
+  'modern-text-first-study-198', // AQA: Leave Taking
+  'modern-text-first-study-1718', // Eduqas: Leave Taking
+  'poetry-anthology-first-study-201', // AQA: Love & Relationships
+  'poetry-anthology-first-study-155', // AQA: Power & Conflict
+  'poetry-anthology-first-study-199', // AQA: World & Lives
+  'poetry-anthology-first-study-203', // Edexcel: Belonging
+  'poetry-anthology-first-study-202', // Edexcel: Conflict
+  'poetry-anthology-first-study-5071', // Eduqas: Anthology 2027
+  'poetry-anthology-first-study-1482', // Eduqas: Anthology 2026
   'non-fiction-crime-and-punishment',
   'non-fiction-changing-views',
-  'modern-text-first-deep-dive-5141',  // AQA: Animal Farm
-  'modern-text-first-deep-dive-5142',  // Edexcel: Animal Farm
-  'modern-text-first-deep-dive-5033',  // AQA/Edexcel/Eduqas: An Inspector Calls
-  'modern-text-first-deep-dive-188',   // AQA: Leave Taking
-  'modern-text-first-deep-dive-1719',  // Eduqas: Leave Taking
-  'poetry-anthology-continued-study-191',  // AQA: Love & Relationships
-  'poetry-anthology-continued-study-172',  // AQA: Power & Conflict
-  'poetry-anthology-continued-study-189',  // AQA: World & Lives
-  'poetry-anthology-continued-study-193',  // Edexcel: Belonging
-  'poetry-anthology-continued-study-192',  // Edexcel: Conflict
+  'modern-text-first-deep-dive-5141', // AQA: Animal Farm
+  'modern-text-first-deep-dive-5142', // Edexcel: Animal Farm
+  'modern-text-first-deep-dive-5033', // AQA/Edexcel/Eduqas: An Inspector Calls
+  'modern-text-first-deep-dive-188', // AQA: Leave Taking
+  'modern-text-first-deep-dive-1719', // Eduqas: Leave Taking
+  'poetry-anthology-continued-study-191', // AQA: Love & Relationships
+  'poetry-anthology-continued-study-172', // AQA: Power & Conflict
+  'poetry-anthology-continued-study-189', // AQA: World & Lives
+  'poetry-anthology-continued-study-193', // Edexcel: Belonging
+  'poetry-anthology-continued-study-192', // Edexcel: Conflict
   'poetry-anthology-continued-study-5070', // Eduqas: Anthology 2027
   'poetry-anthology-continued-study-1483', // Eduqas: Anthology 2026
   'unseen-poetry',
-  'modern-text-second-deep-dive-5143',  // AQA: Animal Farm
-  'modern-text-second-deep-dive-5144',  // Edexcel: Animal Farm
-  'modern-text-second-deep-dive-5034',  // AQA/Edexcel/Eduqas: An Inspector Calls
-  'modern-text-second-deep-dive-194',   // AQA: Leave Taking
-  'modern-text-second-deep-dive-1720',  // Eduqas: Leave Taking
+  'modern-text-second-deep-dive-5143', // AQA: Animal Farm
+  'modern-text-second-deep-dive-5144', // Edexcel: Animal Farm
+  'modern-text-second-deep-dive-5034', // AQA/Edexcel/Eduqas: An Inspector Calls
+  'modern-text-second-deep-dive-194', // AQA: Leave Taking
+  'modern-text-second-deep-dive-1720', // Eduqas: Leave Taking
   'spoken-language-masters-refining-public-speaking-skills',
-  'modern-text-third-deep-dive-5145',   // AQA: Animal Farm
-  'modern-text-third-deep-dive-5146',   // Edexcel: Animal Farm
-  'modern-text-third-deep-dive-4768',   // AQA/Edexcel/Eduqas: An Inspector Calls
-  'modern-text-third-deep-dive-5164',   // AQA: Leave Taking
-  'modern-text-third-deep-dive-5165',   // Eduqas: Leave Taking
+  'modern-text-third-deep-dive-5145', // AQA: Animal Farm
+  'modern-text-third-deep-dive-5146', // Edexcel: Animal Farm
+  'modern-text-third-deep-dive-4768', // AQA/Edexcel/Eduqas: An Inspector Calls
+  'modern-text-third-deep-dive-5164', // AQA: Leave Taking
+  'modern-text-third-deep-dive-5165', // Eduqas: Leave Taking
 ]);
 
 /**

@@ -58,4 +58,3 @@ router.use(checkRole('schooladmin'));
 router.get('/students', getStudents);
 
 export default router;
-

@@ -14,7 +14,9 @@ const startServer = (app: Application) => {
   // CATCH THE ERROR causing the crash
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
-      logger.error(`❌ Port ${config.port} is already in use! Please kill the process running on this port.`);
+      logger.error(
+        `❌ Port ${config.port} is already in use! Please kill the process running on this port.`,
+      );
     } else {
       logger.error('❌ Server error:', err);
     }

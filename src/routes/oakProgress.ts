@@ -74,7 +74,7 @@ router.post(
     body('lessonSlug').optional().isString(),
   ],
   validateRequest,
-  enroll
+  enroll,
 );
 
 /**
@@ -110,12 +110,12 @@ router.post(
 router.put(
   '/enrollments/:id/progress',
   [
-     body('unitSlug').optional().isString(),
-     body('lessonSlug').optional().isString(),
-     // body('videoWatchedPercent').optional().isNumeric(),
+    body('unitSlug').optional().isString(),
+    body('lessonSlug').optional().isString(),
+    // body('videoWatchedPercent').optional().isNumeric(),
   ],
   validateRequest,
-  updateProgress
+  updateProgress,
 );
 
 /**
@@ -161,7 +161,7 @@ router.post(
     body('answers').isArray().withMessage('Answers must be an array'),
   ],
   validateRequest,
-  submitQuiz
+  submitQuiz,
 );
 
 /**
@@ -228,6 +228,5 @@ router.delete(
   validateRequest,
   unenroll,
 );
-
 
 export default router;

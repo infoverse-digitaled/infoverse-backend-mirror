@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { SignJWT } from 'jose';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User';
 import LicenseBatch from '../models/LicenseBatch';
 import { HttpError } from '../utils/httpError';
@@ -9,7 +10,6 @@ import config from '../config';
 import { successResponse } from '../middleware/response';
 import { emailQueue } from '../utils/emailQueue';
 import { isTrialExpired, getSubscriptionTier } from '../utils/subscriptionUtils';
-import { OAuth2Client } from 'google-auth-library';
 
 const client = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
 
@@ -41,10 +41,18 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     if (existingUser) {
       // User exists - check if OAuth user (no password)
       if (!existingUser.passwordHash) {
-        throw new HttpError(401, 'OAUTH_USER', 'This account uses Google sign-in. Please continue with Google.');
+        throw new HttpError(
+          401,
+          'OAUTH_USER',
+          'This account uses Google sign-in. Please continue with Google.',
+        );
       }
-      
-      throw new HttpError(400, 'USER_EXISTS', 'A user with this email already exists. Please log in instead.');
+
+      throw new HttpError(
+        400,
+        'USER_EXISTS',
+        'A user with this email already exists. Please log in instead.',
+      );
     }
 
     // Hash the user's password with a salt round of 10 for security.
@@ -68,10 +76,10 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     if (licenseKey) {
       // Normalize: remove dashes, spaces, and make uppercase
       const normalizedKey = licenseKey.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      
+
       // 1. Try to find an official LicenseBatch
-      let license = await LicenseBatch.findOne({
-        licenseKey: { $regex: new RegExp(`^${normalizedKey.split('').join('[- ]*')}$`, 'i') }
+      const license = await LicenseBatch.findOne({
+        licenseKey: { $regex: new RegExp(`^${normalizedKey.split('').join('[- ]*')}$`, 'i') },
       });
 
       if (license) {
@@ -85,13 +93,17 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         }
 
         if (license.enrolledCount >= license.maxUsers) {
-          throw new HttpError(400, 'LICENSE_FULL', 'This license has reached its maximum user limit.');
+          throw new HttpError(
+            400,
+            'LICENSE_FULL',
+            'This license has reached its maximum user limit.',
+          );
         }
 
         // Increment count
         license.enrolledCount += 1;
         await license.save();
-        
+
         userLicenseKey = license.licenseKey;
         organizationName = license.schoolName;
       } else {
@@ -99,7 +111,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         // Note: Students are often the first to join a trial begun by an admin
         const schoolAdmin = await User.findOne({
           role: 'schooladmin',
-          schoolCode: { $regex: new RegExp(`^${normalizedKey.split('').join('[- ]*')}$`, 'i') }
+          schoolCode: { $regex: new RegExp(`^${normalizedKey.split('').join('[- ]*')}$`, 'i') },
         });
 
         if (!schoolAdmin) {
@@ -108,26 +120,43 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
         // Check if the school admin's account is actually in good standing
         const adminSubscription = schoolAdmin.subscription?.status;
-        const isAdminActive = adminSubscription === 'active' || 
-                             (adminSubscription === 'trialing' && schoolAdmin.subscription?.trialEndsAt && new Date(schoolAdmin.subscription.trialEndsAt) > new Date());
+        const isAdminActive =
+          adminSubscription === 'active' ||
+          (adminSubscription === 'trialing' &&
+            schoolAdmin.subscription?.trialEndsAt &&
+            new Date(schoolAdmin.subscription.trialEndsAt) > new Date());
 
         if (!isAdminActive) {
-          throw new HttpError(400, 'LICENSE_INACTIVE', 'The school associated with this code does not have an active subscription.');
+          throw new HttpError(
+            400,
+            'LICENSE_INACTIVE',
+            'The school associated with this code does not have an active subscription.',
+          );
         }
 
         // Enforce student capacity via LicenseBatch even in the trial fallback path.
         // The LicenseBatch record is created when the school admin registers (maxUsers = 100 for trial).
-        const adminLicenseBatch = await LicenseBatch.findOne({ licenseKey: schoolAdmin.schoolCode });
+        const adminLicenseBatch = await LicenseBatch.findOne({
+          licenseKey: schoolAdmin.schoolCode,
+        });
 
         if (adminLicenseBatch) {
           if (!adminLicenseBatch.isActive) {
-            throw new HttpError(400, 'LICENSE_INACTIVE', 'This school license is no longer active.');
+            throw new HttpError(
+              400,
+              'LICENSE_INACTIVE',
+              'This school license is no longer active.',
+            );
           }
           if (new Date(adminLicenseBatch.expiryDate) <= new Date()) {
             throw new HttpError(400, 'LICENSE_EXPIRED', 'This school license has expired.');
           }
           if (adminLicenseBatch.enrolledCount >= adminLicenseBatch.maxUsers) {
-            throw new HttpError(400, 'LICENSE_FULL', 'This school has reached its maximum student capacity.');
+            throw new HttpError(
+              400,
+              'LICENSE_FULL',
+              'This school has reached its maximum student capacity.',
+            );
           }
           // Increment count atomically
           adminLicenseBatch.enrolledCount += 1;
@@ -136,14 +165,15 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           // No LicenseBatch exists yet — count students directly as a safety fallback
           const currentStudentCount = await User.countDocuments({
             role: 'student',
-            $or: [
-              { schoolCode: schoolAdmin.schoolCode },
-              { licenseKey: schoolAdmin.schoolCode },
-            ],
+            $or: [{ schoolCode: schoolAdmin.schoolCode }, { licenseKey: schoolAdmin.schoolCode }],
           });
           const MAX_TRIAL_STUDENTS = 100;
           if (currentStudentCount >= MAX_TRIAL_STUDENTS) {
-            throw new HttpError(400, 'LICENSE_FULL', 'This school has reached its maximum student capacity.');
+            throw new HttpError(
+              400,
+              'LICENSE_FULL',
+              'This school has reached its maximum student capacity.',
+            );
           }
         }
 
@@ -237,7 +267,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       // User exists - verify password
       // Check if user signed up with OAuth (no password)
       if (!user.passwordHash) {
-        throw new HttpError(401, 'OAUTH_USER', 'This account uses Google sign-in. Please continue with Google.');
+        throw new HttpError(
+          401,
+          'OAUTH_USER',
+          'This account uses Google sign-in. Please continue with Google.',
+        );
       }
 
       const isMatch = await bcrypt.compare(password, user.passwordHash);
@@ -263,16 +297,16 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const data = {
       token,
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
         role: user.role,
         subscription: user.subscription,
         schoolCode: user.schoolCode,
         schoolName: user.schoolName,
         licenseKey: user.licenseKey,
-        keyStage: user.keyStage
+        keyStage: user.keyStage,
       },
     };
     successResponse(res, data, 'Login successful');
@@ -287,12 +321,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { credential } = req.body;
-    
+
     if (!credential) {
       throw new HttpError(400, 'MISSING_CREDENTIAL', 'Google credential is required.');
     }
 
-    
     const allowedAudiences = [
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_IOS_CLIENT_ID,
@@ -303,14 +336,14 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
       idToken: credential,
       audience: allowedAudiences,
     });
-    
+
     const payload = ticket.getPayload();
     if (!payload || !payload.email) {
       throw new HttpError(401, 'INVALID_TOKEN', 'Invalid Google token.');
     }
 
     const { email, name, given_name } = payload;
-    
+
     let user = await User.findOne({ email });
 
     if (!user) {
@@ -344,19 +377,19 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
 
     const data = {
       token,
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
         role: user.role,
         subscription: user.subscription,
         schoolCode: user.schoolCode,
         schoolName: user.schoolName,
         licenseKey: user.licenseKey,
-        keyStage: user.keyStage
+        keyStage: user.keyStage,
       },
     };
-    
+
     successResponse(res, data, 'Google login successful');
   } catch (err) {
     next(err);
@@ -365,7 +398,6 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
 
 export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    
     const { email, platform } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
@@ -405,7 +437,6 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
         null,
         'If a user with that email exists, a password reset token has been sent.',
       );
-
     } catch (err) {
       // If email fails, clear the token from the database
       user.resetPasswordToken = undefined;
@@ -419,7 +450,6 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
         ),
       );
     }
-
   } catch (error) {
     next(new HttpError(500, 'INTERNAL_SERVER_ERROR', 'An unexpected error occurred.'));
   }
@@ -450,7 +480,6 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     user.resetPasswordExpires = undefined;
     await user.save();
 
-
     // 5. Log the user in by sending a new JWT
     const secret = new TextEncoder().encode(config.jwt.secret);
     const token = await new SignJWT({ userId: String(user._id), role: user.role })
@@ -459,7 +488,6 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       .sign(secret);
 
     successResponse(res, { token }, 'Password has been reset successfully.');
-
   } catch (error) {
     next(
       new HttpError(
@@ -502,15 +530,17 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
     // 2. Check if school license has expired (Dynamic check)
     if (user.subscription?.status === 'active' && user.licenseKey) {
       const license = await LicenseBatch.findOne({ licenseKey: user.licenseKey });
-      
+
       const isExpired = !license || !license.isActive || new Date(license.expiryDate) <= new Date();
-      
+
       if (isExpired) {
         // Downgrade user because school access is no longer valid
         user.subscription.status = 'free';
         user.subscription.plan = 'free';
         await user.save();
-        console.log(`[Auth] User ${user.email} downgraded due to expired school license: ${user.licenseKey}`);
+        console.log(
+          `[Auth] User ${user.email} downgraded due to expired school license: ${user.licenseKey}`,
+        );
       }
     }
 
@@ -543,7 +573,11 @@ export const completeOnboarding = async (req: Request, res: Response, next: Next
     // Validate keyStage
     const validKeyStages = ['ks1', 'ks2', 'ks3', 'ks4'];
     if (keyStage && !validKeyStages.includes(keyStage)) {
-      throw new HttpError(400, 'INVALID_KEY_STAGE', 'Key stage must be one of: ks1, ks2, ks3, ks4.');
+      throw new HttpError(
+        400,
+        'INVALID_KEY_STAGE',
+        'Key stage must be one of: ks1, ks2, ks3, ks4.',
+      );
     }
 
     // Update user with onboarding data
@@ -554,7 +588,7 @@ export const completeOnboarding = async (req: Request, res: Response, next: Next
     const updatedUser = await User.findByIdAndUpdate(
       user.id,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).select('-passwordHash');
 
     if (!updatedUser) {
@@ -588,7 +622,7 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
     const updatedUser = await User.findByIdAndUpdate(
       user.id,
       { $set: { name: name.trim() } },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).select('-passwordHash');
 
     if (!updatedUser) {

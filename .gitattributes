@@ -1,0 +1,13 @@
+# Normalize line endings to LF for all text files, matching .editorconfig.
+# Without this, Windows checkouts with core.autocrlf reintroduce CRLF and
+# the prettier/prettier lint rule (and this repo's CI lint gate) fails again.
+* text=auto eol=lf
+
+# Binary files: never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary

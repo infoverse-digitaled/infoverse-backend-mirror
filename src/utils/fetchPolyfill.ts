@@ -13,11 +13,13 @@
 
 // Configure DNS to use Google DNS - MUST happen before any network requests
 const dns = require('dns');
+
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 console.log('[DNS] Configured to use Google DNS:', dns.getServers());
 
 // Polyfill fetch with node-fetch for better compatibility
 const nodeFetch = require('node-fetch');
+
 if (typeof global !== 'undefined') {
   (global as any).fetch = nodeFetch;
   (global as any).Headers = nodeFetch.Headers;

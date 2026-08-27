@@ -36,7 +36,9 @@ jest.mock('../../config/redis', () => ({
 }));
 
 // Mock axios.isAxiosError for error handling
-jest.spyOn(axios, 'isAxiosError').mockImplementation((payload: any) => payload?.isAxiosError === true);
+jest
+  .spyOn(axios, 'isAxiosError')
+  .mockImplementation((payload: any) => payload?.isAxiosError === true);
 
 // Create mock Redis client
 const createMockRedis = (): jest.Mocked<RedisClientInterface> => ({

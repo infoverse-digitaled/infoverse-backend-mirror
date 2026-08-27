@@ -1,4 +1,3 @@
-
 import { faker } from '@faker-js/faker';
 import User from '../../models/User';
 import OakEnrollment from '../../models/OakEnrollment';
@@ -6,17 +5,14 @@ import Progress from '../../models/Progress';
 import { IUser, IOakEnrollment, IProgress } from '../../models/types';
 
 // Password hash for a test user. The actual password is 'password123'
-const testPasswordHash =
-  '$2b$10$Vp2o5z5X/h.4hW5qS3E5lO9l3Y.Z0gZkXwZ5qS3E5lO9l3Y.Z0gZk';
+const testPasswordHash = '$2b$10$Vp2o5z5X/h.4hW5qS3E5lO9l3Y.Z0gZkXwZ5qS3E5lO9l3Y.Z0gZk';
 
 /**
  * Creates and saves a test User to the database.
  * @param {Partial<IUser>} overrides - Optional override values for the user.
  * @returns {Promise<IUser>} A promise that resolves to the created Mongoose User document.
  */
-export const createTestUser = async (
-  overrides: Partial<IUser> = {},
-): Promise<IUser> => {
+export const createTestUser = async (overrides: Partial<IUser> = {}): Promise<IUser> => {
   const defaultUser = {
     name: faker.person.fullName(),
     email: faker.internet.email(),

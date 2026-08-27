@@ -124,7 +124,11 @@ export const createLicenseBatch = async (req: Request, res: Response) => {
     const { schoolName, maxUsers, expiryDate } = req.body;
 
     if (!schoolName || !maxUsers || !expiryDate) {
-      throw new HttpError(400, 'MISSING_FIELDS', 'schoolName, maxUsers, and expiryDate are required.');
+      throw new HttpError(
+        400,
+        'MISSING_FIELDS',
+        'schoolName, maxUsers, and expiryDate are required.',
+      );
     }
 
     if (maxUsers < 1) {
@@ -139,13 +143,17 @@ export const createLicenseBatch = async (req: Request, res: Response) => {
     // Generate a unique license key
     let licenseKey = generateLicenseKey();
     let attempts = 0;
-    while (await LicenseBatch.findOne({ licenseKey }) && attempts < 10) {
+    while ((await LicenseBatch.findOne({ licenseKey })) && attempts < 10) {
       licenseKey = generateLicenseKey();
       attempts++;
     }
 
     if (attempts >= 10) {
-      throw new HttpError(500, 'LICENSE_GENERATION_FAILED', 'Failed to generate unique license key.');
+      throw new HttpError(
+        500,
+        'LICENSE_GENERATION_FAILED',
+        'Failed to generate unique license key.',
+      );
     }
 
     const license = await LicenseBatch.create({
@@ -173,7 +181,8 @@ export const getAllLicenses = async (_req: Request, res: Response) => {
     // Calculate usage stats
     const stats = {
       totalLicenses: licenses.length,
-      activeLicenses: licenses.filter(l => l.isActive && new Date(l.expiryDate) > new Date()).length,
+      activeLicenses: licenses.filter((l) => l.isActive && new Date(l.expiryDate) > new Date())
+        .length,
       totalSeats: licenses.reduce((acc, l) => acc + l.maxUsers, 0),
       usedSeats: licenses.reduce((acc, l) => acc + l.enrolledCount, 0),
     };
@@ -241,7 +250,7 @@ export const updateLicense = async (req: Request, res: Response) => {
     const license = await LicenseBatch.findByIdAndUpdate(
       req.params.id,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!license) {

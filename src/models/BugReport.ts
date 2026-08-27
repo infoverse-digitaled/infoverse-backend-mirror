@@ -60,7 +60,7 @@ const BugReportSchema = new Schema<IBugReport>(
       default: 'new',
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BugReportSchema.index({ status: 1, createdAt: -1 });

@@ -56,7 +56,12 @@ router.post('/subscribe', async (req: Request, res: Response) => {
       // Reactivate if previously unsubscribed
       existing.isActive = true;
       await existing.save();
-      return successResponse(res, { email: existing.email }, 'Successfully resubscribed to newsletter', 200);
+      return successResponse(
+        res,
+        { email: existing.email },
+        'Successfully resubscribed to newsletter',
+        200,
+      );
     }
 
     const subscriber = await Subscriber.create({ email: email.toLowerCase() });
@@ -128,7 +133,7 @@ router.post('/contact', async (req: Request, res: Response) => {
       res,
       { id: contactMessage._id },
       'Your message has been sent successfully. We will get back to you soon!',
-      201
+      201,
     );
   } catch (error: any) {
     console.error('Contact Error:', error);

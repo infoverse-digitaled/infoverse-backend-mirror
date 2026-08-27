@@ -35,7 +35,13 @@ const getMeta = (req: AuthenticatedRequest) => {
 export const getKeyStages = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const keyStages = await oakApiService.getKeyStages();
-    successResponse(res, keyStages, 'Key stages retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      keyStages,
+      'Key stages retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -68,7 +74,13 @@ export const getSubjects = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    successResponse(res, subjects, 'Subjects retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      subjects,
+      'Subjects retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -81,7 +93,13 @@ export const getUnits = async (req: Request, res: Response, next: NextFunction) 
   try {
     const { keyStage, subjectSlug } = req.params;
     const units = await oakApiService.getUnits(keyStage, subjectSlug);
-    successResponse(res, units, 'Units retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      units,
+      'Units retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -94,7 +112,13 @@ export const getUnitDetails = async (req: Request, res: Response, next: NextFunc
   try {
     const { unitSlug } = req.params;
     const unit = await oakApiService.getUnitDetails(unitSlug);
-    successResponse(res, unit, 'Unit details retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      unit,
+      'Unit details retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -112,11 +136,17 @@ export const getLessons = async (req: Request, res: Response, next: NextFunction
     // Lock lessons on paid subjects for free users, mirroring getSubjects.
     if (isFreeUser(req as AuthenticatedRequest)) {
       lessons = lessons.map((lesson) =>
-        PAID_SUBJECTS.includes(lesson.subjectSlug) ? { ...lesson, locked: true } : lesson
+        PAID_SUBJECTS.includes(lesson.subjectSlug) ? { ...lesson, locked: true } : lesson,
       );
     }
 
-    successResponse(res, lessons, 'Lessons retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      lessons,
+      'Lessons retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -129,7 +159,13 @@ export const getLessonDetails = async (req: Request, res: Response, next: NextFu
   try {
     const { lessonSlug } = req.params;
     const lessonDetails = await oakApiService.getLessonDetails(lessonSlug);
-    successResponse(res, lessonDetails, 'Lesson details retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      lessonDetails,
+      'Lesson details retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -142,7 +178,13 @@ export const getLessonQuiz = async (req: Request, res: Response, next: NextFunct
   try {
     const { lessonSlug } = req.params;
     const quiz = await oakApiService.getLessonQuiz(lessonSlug);
-    successResponse(res, quiz, 'Quiz retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      quiz,
+      'Quiz retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -156,12 +198,18 @@ export const getLessonAssets = async (req: Request, res: Response, next: NextFun
   try {
     const { lessonSlug } = req.params;
     // Get the base URL for our backend to rewrite asset URLs
-    const protocol = req.protocol;
+    const { protocol } = req;
     const host = req.get('host');
     const backendBaseUrl = `${protocol}://${host}`;
 
     const assets = await oakApiService.getLessonAssets(lessonSlug, backendBaseUrl);
-    successResponse(res, assets, 'Lesson assets retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      assets,
+      'Lesson assets retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -179,7 +227,8 @@ export const getAssetFile = async (req: Request, res: Response, next: NextFuncti
     const { lessonSlug, assetType } = req.params;
 
     const oakApiKey = process.env.OAK_API_KEY;
-    const oakBaseUrl = process.env.OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0';
+    const oakBaseUrl =
+      process.env.OAK_API_BASE_URL || 'https://open-api.thenational.academy/api/v0';
 
     // CORS headers
     const requestOrigin = req.headers.origin || 'https://infoversedigitaleducation.net';
@@ -247,7 +296,13 @@ export const getLessonTranscript = async (req: Request, res: Response, next: Nex
   try {
     const { lessonSlug } = req.params;
     const transcript = await oakApiService.getLessonTranscript(lessonSlug);
-    successResponse(res, transcript, 'Lesson transcript retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      transcript,
+      'Lesson transcript retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }
@@ -273,7 +328,7 @@ export const clearSubjectCache = async (req: Request, res: Response, next: NextF
       res,
       { deletedCount, keyStage, subjectSlug },
       `Cache cleared for ${keyStage}/${subjectSlug}. ${deletedCount} keys deleted.`,
-      200
+      200,
     );
   } catch (error) {
     next(error);
@@ -299,7 +354,7 @@ export const clearKeyStageCache = async (req: Request, res: Response, next: Next
       res,
       { deletedCount, keyStage },
       `Cache cleared for ${keyStage}. ${deletedCount} keys deleted.`,
-      200
+      200,
     );
   } catch (error) {
     next(error);
@@ -317,7 +372,7 @@ export const clearAllCache = async (req: Request, res: Response, next: NextFunct
       res,
       { deletedCount },
       `All Oak API cache cleared. ${deletedCount} keys deleted.`,
-      200
+      200,
     );
   } catch (error) {
     next(error);
@@ -375,7 +430,13 @@ export const searchLessons = async (req: Request, res: Response, next: NextFunct
       });
     }
 
-    successResponse(res, results, 'Search results retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
+    successResponse(
+      res,
+      results,
+      'Search results retrieved successfully',
+      200,
+      getMeta(req as AuthenticatedRequest),
+    );
   } catch (error) {
     next(error);
   }

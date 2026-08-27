@@ -109,10 +109,7 @@ const ProgressSchema = new Schema<IProgress, IProgressModel>(
 );
 
 // Compound index to prevent duplicate progress records
-ProgressSchema.index(
-  { enrollmentId: 1, lessonSlug: 1 },
-  { unique: true },
-);
+ProgressSchema.index({ enrollmentId: 1, lessonSlug: 1 }, { unique: true });
 
 // Additional indexes for common queries
 ProgressSchema.index({ userId: 1, status: 1 });

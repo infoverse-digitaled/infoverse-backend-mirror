@@ -26,7 +26,7 @@ const SubscriberSchema = new Schema<ISubscriber>(
       default: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model<ISubscriber>('Subscriber', SubscriberSchema);

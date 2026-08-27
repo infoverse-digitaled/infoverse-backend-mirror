@@ -192,7 +192,7 @@ router.put(
   isAdmin,
   adminUpdateUserValidationRules,
   validateRequest,
-  updateUser
+  updateUser,
 );
 /**
  * @swagger
@@ -411,12 +411,7 @@ router.delete('/reviews/:reviewId', authenticateJWT, isAdmin, deleteReview);
  *       403:
  *         description: Forbidden
  */
-router.get(
-  '/enrollments/course/:courseId',
-  authenticateJWT,
-  isAdmin,
-  getCourseEnrollments,
-);
+router.get('/enrollments/course/:courseId', authenticateJWT, isAdmin, getCourseEnrollments);
 
 /**
  * @swagger
@@ -440,12 +435,7 @@ router.get(
  *       403:
  *         description: Forbidden
  */
-router.get(
-  '/enrollments/user/:userId',
-  authenticateJWT,
-  isAdmin,
-  getUserEnrollments,
-);
+router.get('/enrollments/user/:userId', authenticateJWT, isAdmin, getUserEnrollments);
 
 // Content Management
 /**

@@ -51,7 +51,7 @@ export const startTrial = async (req: Request, res: Response) => {
     }
 
     const { planCode } = req.body;
-    const user = (req as any).user;
+    const { user } = req as any;
 
     if (!user || !user.email) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -64,11 +64,11 @@ export const startTrial = async (req: Request, res: Response) => {
 
     // Check if user is already trialing
     if (user.subscription?.status === 'trialing') {
-      const trialEndsAt = user.subscription.trialEndsAt;
+      const { trialEndsAt } = user.subscription;
       if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
         return res.status(400).json({
           error: 'You already have an active trial',
-          trialEndsAt: trialEndsAt,
+          trialEndsAt,
         });
       }
     }
@@ -131,7 +131,7 @@ export const startTrial = async (req: Request, res: Response) => {
 export const startTrialWithCard = async (req: Request, res: Response) => {
   try {
     const { planCode } = req.body;
-    const user = (req as any).user;
+    const { user } = req as any;
 
     if (!user || !user.email) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -164,7 +164,7 @@ export const startTrialWithCard = async (req: Request, res: Response) => {
 export const verifyTrial = async (req: Request, res: Response) => {
   try {
     const { reference } = req.body;
-    const user = (req as any).user;
+    const { user } = req as any;
 
     if (!user) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -206,7 +206,7 @@ export const verifyTrial = async (req: Request, res: Response) => {
 export const verifyPayment = async (req: Request, res: Response) => {
   try {
     const { reference } = req.body;
-    const user = (req as any).user;
+    const { user } = req as any;
 
     if (!user) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -265,28 +265,25 @@ export const verifyPayment = async (req: Request, res: Response) => {
         expiryDate: newExpiry.toISOString(),
         weeksGranted: TERM_WEEKS,
       });
-    } else {
-      // --- Recurring subscription (plan) flow ---
-      const planCode = verificationResult.data.plan;
-      let planName = 'premium';
-      const planEntry = Object.entries(PAYSTACK_PLANS).find(
-        ([_, p]) => (p as any).code === planCode,
-      );
-      if (planEntry) {
-        planName = planEntry[0].toLowerCase();
-      }
-
-      await User.findByIdAndUpdate(user.id, {
-        'subscription.status': 'active',
-        'subscription.plan': planName,
-        'subscription.trialEndsAt': null,
-      });
-
-      return res.status(200).json({
-        message: 'Payment verified successfully! Your subscription is now active.',
-        success: true,
-      });
     }
+    // --- Recurring subscription (plan) flow ---
+    const planCode = verificationResult.data.plan;
+    let planName = 'premium';
+    const planEntry = Object.entries(PAYSTACK_PLANS).find(([_, p]) => (p as any).code === planCode);
+    if (planEntry) {
+      planName = planEntry[0].toLowerCase();
+    }
+
+    await User.findByIdAndUpdate(user.id, {
+      'subscription.status': 'active',
+      'subscription.plan': planName,
+      'subscription.trialEndsAt': null,
+    });
+
+    return res.status(200).json({
+      message: 'Payment verified successfully! Your subscription is now active.',
+      success: true,
+    });
   } catch (error: any) {
     console.error('Verify Payment Error:', error);
     res.status(500).json({ error: error.message || 'Failed to verify payment' });
@@ -313,7 +310,7 @@ export const initializePayment = async (req: Request, res: Response) => {
 
     // Accept either a Paystack planCode (for recurring) or a tierId (for one-time term)
     const { planCode, tierId, callbackUrl: requestedCallbackUrl } = req.body;
-    const user = (req as any).user;
+    const { user } = req as any;
 
     if (!user || !user.email) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -367,7 +364,9 @@ export const initializePayment = async (req: Request, res: Response) => {
       const freshUser = await User.findById(user.id || user.userId).lean();
       const existingSubCode = freshUser?.subscription?.paystackSubscriptionCode;
       if (existingSubCode) {
-        console.log(`[Payment] Cancelling old subscription ${existingSubCode} before switching plans`);
+        console.log(
+          `[Payment] Cancelling old subscription ${existingSubCode} before switching plans`,
+        );
         await paystackService.cancelSubscription(existingSubCode);
         // Clear the stored code immediately so we don't double-cancel
         await User.findByIdAndUpdate(user.id || user.userId, {
@@ -381,7 +380,7 @@ export const initializePayment = async (req: Request, res: Response) => {
       resolvedPlanCode,
       planAmount!,
       callbackUrl,
-      tierId ?? null,  // Forward tierId so verifyPayment can update LicenseBatch.maxUsers
+      tierId ?? null, // Forward tierId so verifyPayment can update LicenseBatch.maxUsers
     );
 
     res.status(200).json({
@@ -488,7 +487,7 @@ export const getPlans = async (_req: Request, res: Response) => {
  */
 export const cancelUserSubscription = async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const { user } = req as any;
 
     if (!user) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -511,7 +510,9 @@ export const cancelUserSubscription = async (req: Request, res: Response) => {
       // (Paystack will also fire subscription.disable webhook to confirm)
       await paystackService.cancelSubscription(subCode);
     } else {
-      console.warn(`[Cancel] User ${freshUser.email} has no paystackSubscriptionCode — downgrading locally only`);
+      console.warn(
+        `[Cancel] User ${freshUser.email} has no paystackSubscriptionCode — downgrading locally only`,
+      );
     }
 
     // Immediately downgrade to free tier in the DB regardless of Paystack result

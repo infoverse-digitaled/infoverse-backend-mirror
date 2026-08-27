@@ -40,7 +40,7 @@ const ContactMessageSchema = new Schema<IContactMessage>(
       default: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Index for querying unread messages

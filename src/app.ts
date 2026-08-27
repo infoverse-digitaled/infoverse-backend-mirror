@@ -21,20 +21,22 @@ const app = express();
 // Trust proxy for Render/production (required for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
 
-// Gzip compression for all responses. 
+// Gzip compression for all responses.
 // We add a filter to skip compression for video/audio streams to prevent buffering issues.
-app.use(compression({
-  filter: (req, res) => {
-    const contentType = res.getHeader('Content-Type');
-    if (contentType && typeof contentType === 'string') {
-      if (contentType.startsWith('video/') || contentType.startsWith('audio/')) {
-        return false; // Don't compress video/audio (prevents buffering and "size too large" errors)
+app.use(
+  compression({
+    filter: (req, res) => {
+      const contentType = res.getHeader('Content-Type');
+      if (contentType && typeof contentType === 'string') {
+        if (contentType.startsWith('video/') || contentType.startsWith('audio/')) {
+          return false; // Don't compress video/audio (prevents buffering and "size too large" errors)
+        }
       }
-    }
-    // Fallback to standard compression filter
-    return compression.filter(req, res);
-  }
-}));
+      // Fallback to standard compression filter
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // Configure CORS to allow requests from the frontend.
 // Support multiple origins for development (localhost) and production (infoversedigitaleducation.net)
@@ -46,27 +48,36 @@ const allowedOrigins = [
 ].filter(Boolean); // Remove any undefined values
 
 // Configure CORS with all necessary options
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // SECURITY FIX: Reject unknown origins to prevent CSRF attacks
-      console.warn(`CORS request BLOCKED from unknown origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Range'],
-  exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges'],
-  maxAge: 86400, // Cache preflight for 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-}));
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        // SECURITY FIX: Reject unknown origins to prevent CSRF attacks
+        console.warn(`CORS request BLOCKED from unknown origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Range',
+    ],
+    exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges'],
+    maxAge: 86400, // Cache preflight for 24 hours
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  }),
+);
 
 // Handle OPTIONS requests explicitly for all routes
 // Express 5.x requires named wildcards - use '{*path}' instead of '*'

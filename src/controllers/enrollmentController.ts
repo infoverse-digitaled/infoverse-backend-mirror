@@ -183,10 +183,14 @@ export const getEnrollmentStatus = async (req: AuthenticatedRequest, res: Respon
 
     const enrollment = await Enrollment.findOne({ userId, courseId });
 
-    successResponse(res, {
-      enrolled: !!enrollment,
-      enrollment: enrollment || null,
-    }, 'Enrollment status retrieved successfully');
+    successResponse(
+      res,
+      {
+        enrolled: !!enrollment,
+        enrollment: enrollment || null,
+      },
+      'Enrollment status retrieved successfully',
+    );
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

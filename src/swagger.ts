@@ -10,7 +10,8 @@ const options = {
     info: {
       title: 'Infoverse API', // The title of your API
       version: '1.0.0', // The version of your API
-      description: 'API documentation for the Infoverse platform, a comprehensive learning management system.',
+      description:
+        'API documentation for the Infoverse platform, a comprehensive learning management system.',
     },
     // Define the base path for your API
     servers: [
@@ -45,7 +46,8 @@ const options = {
       },
       {
         name: 'Oak Content',
-        description: 'Oak National Academy curriculum content — key stages, subjects, units, lessons, quizzes, and assets',
+        description:
+          'Oak National Academy curriculum content — key stages, subjects, units, lessons, quizzes, and assets',
       },
       {
         name: 'Oak Progress',
@@ -71,7 +73,7 @@ const specs = swaggerJsdoc(options);
 export const setupSwagger = (app: Express) => {
   // Serve the Swagger UI at /api-docs
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
-  
+
   // Expose the raw JSON spec for external tools
   app.get('/swagger.json', (_req, res) => {
     res.setHeader('Content-Type', 'application/json');

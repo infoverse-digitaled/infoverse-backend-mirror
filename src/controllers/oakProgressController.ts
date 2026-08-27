@@ -34,8 +34,9 @@ export const getMyProgress = async (req: Request, res: Response, next: NextFunct
 
         // Calculate overall progress
         const totalLessons = progressRecords.length;
-        const completedLessons = progressRecords.filter(p => p.status === 'completed').length;
-        const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+        const completedLessons = progressRecords.filter((p) => p.status === 'completed').length;
+        const progressPercent =
+          totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
         return {
           _id: enrollment._id,
@@ -48,7 +49,7 @@ export const getMyProgress = async (req: Request, res: Response, next: NextFunct
             totalLessons,
             completedLessons,
             progressPercent,
-            lessons: progressRecords.map(p => ({
+            lessons: progressRecords.map((p) => ({
               lessonSlug: p.lessonSlug,
               unitSlug: p.unitSlug,
               status: p.status,
@@ -57,7 +58,7 @@ export const getMyProgress = async (req: Request, res: Response, next: NextFunct
             })),
           },
         };
-      })
+      }),
     );
 
     successResponse(res, enrollmentsWithProgress, 'Progress retrieved successfully');
@@ -81,18 +82,20 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
   // Validate keyStage enum
   const VALID_KEY_STAGES = ['ks1', 'ks2', 'ks3', 'ks4'];
   if (!VALID_KEY_STAGES.includes(keyStage)) {
-    return next(new HttpError(400, `Invalid keyStage. Must be one of: ${VALID_KEY_STAGES.join(', ')}`, 'INVALID_KEY_STAGE'));
+    return next(
+      new HttpError(
+        400,
+        `Invalid keyStage. Must be one of: ${VALID_KEY_STAGES.join(', ')}`,
+        'INVALID_KEY_STAGE',
+      ),
+    );
   }
 
   // Freemium Check: paid subjects require an active subscription
   if (PAID_SUBJECTS.includes(subjectSlug)) {
     if (isFreeUser(user)) {
       return next(
-        new HttpError(
-          403,
-          'This content requires a premium subscription.',
-          'PREMIUM_REQUIRED'
-        )
+        new HttpError(403, 'This content requires a premium subscription.', 'PREMIUM_REQUIRED'),
       );
     }
   }
@@ -122,7 +125,13 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
           // Another request already created the enrollment — fetch it
           enrollment = await OakEnrollment.findOne({ userId: user.id, subjectSlug, keyStage });
           if (!enrollment) {
-            return next(new HttpError(500, 'Failed to retrieve enrollment after conflict', 'INTERNAL_SERVER_ERROR'));
+            return next(
+              new HttpError(
+                500,
+                'Failed to retrieve enrollment after conflict',
+                'INTERNAL_SERVER_ERROR',
+              ),
+            );
           }
           await enrollment.updateLastAccessed();
         } else {
@@ -166,7 +175,7 @@ export const enroll = async (req: Request, res: Response, next: NextFunction) =>
 export const updateProgress = async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params; // Enrollment ID
   const { lessonSlug, unitSlug } = req.body;
-  
+
   // Note: videoWatchedPercent / slidesViewed are not currently stored in the Progress model,
   // but we accept them to simulate the heartbeat logic requested.
 
@@ -185,21 +194,21 @@ export const updateProgress = async (req: Request, res: Response, next: NextFunc
 
     // If specific lesson details are provided, ensure a Progress record exists/is updated
     if (lessonSlug && unitSlug) {
-        let progress = await Progress.findOne({
-            enrollmentId: id,
-            lessonSlug
-        });
+      let progress = await Progress.findOne({
+        enrollmentId: id,
+        lessonSlug,
+      });
 
-        if (!progress) {
-             progress = await Progress.create({
-                enrollmentId: id,
-                userId: enrollment.userId,
-                unitSlug,
-                lessonSlug,
-                status: 'started'
-            });
-        }
-        // In a real implementation, we would update granular fields here
+      if (!progress) {
+        progress = await Progress.create({
+          enrollmentId: id,
+          userId: enrollment.userId,
+          unitSlug,
+          lessonSlug,
+          status: 'started',
+        });
+      }
+      // In a real implementation, we would update granular fields here
     }
 
     successResponse(res, null, 'Progress updated successfully');
@@ -255,19 +264,22 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
     if (calculatedScore >= 80) {
       await progress.markCompleted(calculatedScore);
     } else {
-        // Just update the score but keep as started/in-progress if failed? 
-        // Schema supports quizScore even if not completed, but markCompleted sets both.
-        // We'll manually update if not completed.
-        progress.quizScore = calculatedScore;
-        await progress.save();
+      // Just update the score but keep as started/in-progress if failed?
+      // Schema supports quizScore even if not completed, but markCompleted sets both.
+      // We'll manually update if not completed.
+      progress.quizScore = calculatedScore;
+      await progress.save();
     }
 
-    successResponse(res, {
+    successResponse(
+      res,
+      {
         score: calculatedScore,
         passed: calculatedScore >= 80,
-        status: progress.status
-    }, 'Quiz submitted successfully');
-
+        status: progress.status,
+      },
+      'Quiz submitted successfully',
+    );
   } catch (error) {
     next(error);
   }
@@ -281,11 +293,11 @@ const calculateStreak = (activityDates: Date[]): number => {
 
   // Sort dates in descending order (most recent first)
   const sortedDates = activityDates
-    .map(d => new Date(d))
+    .map((d) => new Date(d))
     .sort((a, b) => b.getTime() - a.getTime());
 
   // Normalize to date-only strings for comparison
-  const uniqueDays = [...new Set(sortedDates.map(d => d.toISOString().split('T')[0]))];
+  const uniqueDays = [...new Set(sortedDates.map((d) => d.toISOString().split('T')[0]))];
 
   if (uniqueDays.length === 0) return 0;
 
@@ -334,7 +346,8 @@ export const recordActivity = async (req: Request, res: Response, next: NextFunc
 
     // Check if we already recorded activity today
     const activityDates = userDoc.activityDates || [];
-    const lastActivity = activityDates.length > 0 ? new Date(activityDates[activityDates.length - 1]) : null;
+    const lastActivity =
+      activityDates.length > 0 ? new Date(activityDates[activityDates.length - 1]) : null;
     const lastActivityDay = lastActivity ? lastActivity.toISOString().split('T')[0] : null;
     const todayStr = today.toISOString().split('T')[0];
 
@@ -344,7 +357,7 @@ export const recordActivity = async (req: Request, res: Response, next: NextFunc
 
       // Keep only last 90 days of activity
       const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000);
-      const recentDates = activityDates.filter(d => new Date(d) >= ninetyDaysAgo);
+      const recentDates = activityDates.filter((d) => new Date(d) >= ninetyDaysAgo);
 
       // Calculate new streak
       const newStreak = calculateStreak(recentDates);
@@ -358,7 +371,11 @@ export const recordActivity = async (req: Request, res: Response, next: NextFunc
       successResponse(res, { streak: newStreak, recorded: true }, 'Activity recorded');
     } else {
       // Already recorded today
-      successResponse(res, { streak: userDoc.currentStreak || 0, recorded: false }, 'Activity already recorded today');
+      successResponse(
+        res,
+        { streak: userDoc.currentStreak || 0, recorded: false },
+        'Activity already recorded today',
+      );
     }
   } catch (error) {
     next(error);
@@ -390,10 +407,14 @@ export const getStreak = async (req: Request, res: Response, next: NextFunction)
       await User.findByIdAndUpdate(user.id, { currentStreak });
     }
 
-    successResponse(res, {
-      streak: currentStreak,
-      lastActiveAt: userDoc.lastActiveAt,
-    }, 'Streak retrieved');
+    successResponse(
+      res,
+      {
+        streak: currentStreak,
+        lastActiveAt: userDoc.lastActiveAt,
+      },
+      'Streak retrieved',
+    );
   } catch (error) {
     next(error);
   }

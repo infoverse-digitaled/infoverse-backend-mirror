@@ -1,4 +1,3 @@
-
 import winston from 'winston';
 import config from '../config';
 
@@ -11,9 +10,7 @@ const logFormat = printf(({ level, message, timestamp, stack }) => {
 
 // Build transports based on environment
 // Cloud Run has a read-only filesystem, so we only use file transports in development
-const transports: winston.transport[] = [
-  new winston.transports.Console(),
-];
+const transports: winston.transport[] = [new winston.transports.Console()];
 
 if (config.env !== 'production') {
   transports.push(
@@ -21,7 +18,7 @@ if (config.env !== 'production') {
       filename: 'logs/error.log',
       level: 'error',
     }),
-    new winston.transports.File({ filename: 'logs/combined.log' })
+    new winston.transports.File({ filename: 'logs/combined.log' }),
   );
 }
 
@@ -39,12 +36,8 @@ const logger = winston.createLogger({
   transports,
   // Only use file handlers in development
   ...(config.env !== 'production' && {
-    exceptionHandlers: [
-      new winston.transports.File({ filename: 'logs/exceptions.log' }),
-    ],
-    rejectionHandlers: [
-      new winston.transports.File({ filename: 'logs/rejections.log' }),
-    ],
+    exceptionHandlers: [new winston.transports.File({ filename: 'logs/exceptions.log' })],
+    rejectionHandlers: [new winston.transports.File({ filename: 'logs/rejections.log' })],
   }),
 });
 

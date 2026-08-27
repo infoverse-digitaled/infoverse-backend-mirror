@@ -17,7 +17,11 @@ export const registerSchoolAdmin = async (req: Request, res: Response, next: Nex
     const { name, email, password, schoolName } = req.body;
 
     if (!name || !email || !password || !schoolName) {
-      throw new HttpError(400, 'MISSING_FIELDS', 'Name, email, password, and school name are required.');
+      throw new HttpError(
+        400,
+        'MISSING_FIELDS',
+        'Name, email, password, and school name are required.',
+      );
     }
 
     // Check if a user with the same email already exists.
@@ -27,7 +31,10 @@ export const registerSchoolAdmin = async (req: Request, res: Response, next: Nex
     }
 
     // Generate unique schoolCode
-    const sanitizedSchoolName = schoolName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 8);
+    const sanitizedSchoolName = schoolName
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .substring(0, 8);
     const randomString = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
     const schoolCode = `${sanitizedSchoolName}-${randomString}`;
 
@@ -106,11 +113,16 @@ export const getStudents = async (req: Request, res: Response, next: NextFunctio
       role: 'student',
       $or: [
         { schoolCode: adminUser.schoolCode },
-        { licenseKey: adminUser.schoolCode } // Fallback for backwards compatibility with existing UI
-      ]
+        { licenseKey: adminUser.schoolCode }, // Fallback for backwards compatibility with existing UI
+      ],
     }).select('-passwordHash -__v');
 
-    successResponse(res, { students, schoolCode: adminUser.schoolCode, schoolName: adminUser.schoolName }, 'Students retrieved successfully', 200);
+    successResponse(
+      res,
+      { students, schoolCode: adminUser.schoolCode, schoolName: adminUser.schoolName },
+      'Students retrieved successfully',
+      200,
+    );
   } catch (err) {
     next(err);
   }
