@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
-import mongoose, { Query } from 'mongoose'; // <-- 1. Import the Query type
+import mongoose from 'mongoose';
 import Course from '../models/Course';
 import { HttpError } from '../utils/httpError';
 import redisClient from '../config/redis';
 import { successResponse } from '../middleware/response';
+import { getErrorMessage } from '../utils/errors';
 
 // Extend req typing for authenticated routes
 interface AuthenticatedRequest extends Request {
@@ -14,10 +15,27 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+/**
+ * Delete all cached keys matching a prefix. Redis's DEL has no wildcard
+ * support - `del('courses:*')` would only ever delete a literal key named
+ * "courses:*", which never exists, so cache invalidation must scan first.
+ */
+const clearCachePattern = async (pattern: string): Promise<void> => {
+  const keys = await redisClient.keys(pattern);
+  if (keys.length > 0) {
+    await redisClient.del(keys);
+  }
+};
+
 export const listCourses = async (req: Request, res: Response) => {
   const { page = 1, limit = 10, sort, fields, search } = req.query;
 
-  const filters: { [key: string]: any } = { ...req.query };
+  // Built dynamically from arbitrary query params, then passed straight to
+  // Mongoose's find/countDocuments - modeling this against Mongoose's
+  // FilterQuery<T> generics for a param bag whose keys aren't known ahead of
+  // time isn't worth the complexity it'd add here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filters: Record<string, any> = { ...req.query };
   delete filters.page;
   delete filters.limit;
   delete filters.sort;
@@ -35,7 +53,7 @@ export const listCourses = async (req: Request, res: Response) => {
   const cacheKey = `courses:page=${pageNum}&limit=${limitNum}&sort=${sort || ''}&fields=${fields || ''}&search=${search || ''}`;
 
   try {
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedCourses = await redisClient.get(cacheKey);
       if (cachedCourses) {
         const parsedCache = JSON.parse(cachedCourses);
@@ -43,7 +61,11 @@ export const listCourses = async (req: Request, res: Response) => {
       }
     }
 
-    let query: Query<any, any> = Course.find(filters);
+    // Reassigned below through conditional .sort()/.select() chaining;
+    // typing this against Mongoose's Query<> generics for a filter object
+    // whose shape isn't known ahead of time isn't worth the complexity here.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: mongoose.Query<any, any> = Course.find(filters);
 
     // Sorting Logic
     if (sort) {
@@ -76,10 +98,10 @@ export const listCourses = async (req: Request, res: Response) => {
       },
     };
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
     }
-    successResponse(res, result, 'Courses retrieved successfully');
+    return successResponse(res, result, 'Courses retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -93,7 +115,7 @@ export const getCourseById = async (req: Request, res: Response) => {
     throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
   }
   try {
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedCourse = await redisClient.get(cacheKey);
       if (cachedCourse) {
         const parsedCache = JSON.parse(cachedCourse);
@@ -107,14 +129,14 @@ export const getCourseById = async (req: Request, res: Response) => {
     }
 
     const response = { data: course };
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
         console.error('Failed to cache course', e);
       }
     }
-    successResponse(res, course, 'Course retrieved successfully');
+    return successResponse(res, course, 'Course retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -130,7 +152,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
 
     if (currentUser!.role === 'admin') {
       if (!instructorId) {
-        return new HttpError(
+        throw new HttpError(
           400,
           'Admin must specify an instructorId in the request body.',
           'INSTRUCTOR_ID_REQUIRED',
@@ -150,17 +172,17 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response) => 
       syllabus,
       instructorId: finalInstructorId,
     });
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
-        await redisClient.del('courses:*');
+        await clearCachePattern('courses:*');
       } catch (e) {
         console.error('Failed to clear course cache', e);
       }
     }
     successResponse(res, course, 'Course created successfully', 201);
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(500, 'Internal server error', error.message);
+    throw new HttpError(500, 'Internal server error', getErrorMessage(error, 'Unknown error'));
   }
 };
 
@@ -173,10 +195,10 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response) => 
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.del(`course:${req.params.id}`);
-        await redisClient.del('courses:*');
+        await clearCachePattern('courses:*');
       } catch (e) {
         console.error('Failed to clear course cache', e);
       }
@@ -198,10 +220,10 @@ export const deleteCourse = async (req: AuthenticatedRequest, res: Response) => 
     if (!course) {
       throw new HttpError(404, 'Course not found', 'NOT_FOUND');
     }
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.del(`course:${req.params.id}`);
-        await redisClient.del('courses:*');
+        await clearCachePattern('courses:*');
       } catch (e) {
         console.error('Failed to clear course cache', e);
       }

@@ -53,7 +53,7 @@ export const enrollInCourse = async (req: AuthenticatedRequest, res: Response) =
       }
     }
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.del(`userEnrollments:${userId}`);
         await redisClient.del(`courseEnrollments:${courseId}`);
@@ -81,7 +81,7 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
     }
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
         const parsedCache = JSON.parse(cachedEnrollments);
@@ -92,14 +92,14 @@ export const getCourseEnrollments = async (req: Request, res: Response) => {
     const enrollments = await Enrollment.find({ courseId }).populate('userId');
     const response = { data: enrollments };
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
         console.error('Failed to cache course enrollments', e);
       }
     }
-    successResponse(res, enrollments, 'Enrollments retrieved successfully');
+    return successResponse(res, enrollments, 'Enrollments retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -122,7 +122,7 @@ export const updateEnrollmentStatus = async (req: Request, res: Response) => {
       throw new HttpError(404, 'Enrollment not found', 'NOT_FOUND');
     }
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.del(`userEnrollments:${enrollment.userId}`);
         await redisClient.del(`courseEnrollments:${enrollment.courseId}`);
@@ -152,7 +152,7 @@ export const dropCourse = async (req: AuthenticatedRequest, res: Response) => {
       throw new HttpError(404, 'Enrollment not found', 'NOT_FOUND');
     }
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.del(`userEnrollments:${userId}`);
         await redisClient.del(`courseEnrollments:${courseId}`);
@@ -210,7 +210,7 @@ export const getUserEnrollments = async (req: Request, res: Response) => {
       throw new HttpError(400, 'Invalid user ID', 'INVALID_ID');
     }
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedEnrollments = await redisClient.get(cacheKey);
       if (cachedEnrollments) {
         const parsedCache = JSON.parse(cachedEnrollments);
@@ -221,14 +221,14 @@ export const getUserEnrollments = async (req: Request, res: Response) => {
     const enrollments = await Enrollment.find({ userId }).populate('courseId');
     const response = { data: enrollments };
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
       } catch (e) {
         console.error('Failed to cache user enrollments', e);
       }
     }
-    successResponse(res, enrollments, 'Enrollments retrieved successfully');
+    return successResponse(res, enrollments, 'Enrollments retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');

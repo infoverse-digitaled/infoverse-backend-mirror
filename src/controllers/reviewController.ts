@@ -1,4 +1,4 @@
-import { Request, Response, RequestHandler } from 'express';
+import { RequestHandler } from 'express';
 import mongoose from 'mongoose';
 import Review from '../models/Review';
 import { HttpError } from '../utils/httpError';
@@ -14,7 +14,7 @@ export const getCourseReviews: RequestHandler = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       throw new HttpError(400, 'Invalid course ID', 'INVALID_ID');
     }
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedReviews = await redisClient.get(cacheKey);
       if (cachedReviews) {
         const parsedCache = JSON.parse(cachedReviews);
@@ -25,7 +25,7 @@ export const getCourseReviews: RequestHandler = async (req, res) => {
 
     const reviews = await Review.find({ courseId }).populate('userId', 'name');
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify({ data: reviews }));
       } catch (e) {
@@ -71,7 +71,7 @@ export const deleteReview: RequestHandler = async (req, res) => {
       throw new HttpError(404, 'Review not found', 'NOT_FOUND');
     }
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.del(`reviews:${review.courseId}`);
     }
 
@@ -104,7 +104,7 @@ export const deleteOwnReview: RequestHandler = async (req, res) => {
 
     await Review.findByIdAndDelete(reviewId);
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.del(`reviews:${review.courseId}`);
     }
 

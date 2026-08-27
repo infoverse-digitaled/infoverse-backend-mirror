@@ -32,7 +32,7 @@ export const getPosts = async (req: Request, res: Response, next: NextFunction) 
 
     // Check cache
     const cacheKey = `posts:${JSON.stringify(query)}:${pageNum}:${limitNum}`;
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cached = await redisClient.get(cacheKey);
       if (cached) {
         return successResponse(res, JSON.parse(cached), 'Posts retrieved from cache');
@@ -61,13 +61,13 @@ export const getPosts = async (req: Request, res: Response, next: NextFunction) 
     };
 
     // Cache for 1 hour
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(result));
     }
 
-    successResponse(res, result, 'Posts retrieved successfully');
+    return successResponse(res, result, 'Posts retrieved successfully');
   } catch (err) {
-    next(err);
+    return next(err);
   }
 };
 
@@ -81,7 +81,7 @@ export const getPostBySlug = async (req: Request, res: Response, next: NextFunct
 
     // Check cache
     const cacheKey = `post:${slug}`;
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cached = await redisClient.get(cacheKey);
       if (cached) {
         return successResponse(res, JSON.parse(cached), 'Post retrieved from cache');
@@ -95,13 +95,13 @@ export const getPostBySlug = async (req: Request, res: Response, next: NextFunct
     }
 
     // Cache for 1 hour
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(post));
     }
 
-    successResponse(res, post, 'Post retrieved successfully');
+    return successResponse(res, post, 'Post retrieved successfully');
   } catch (err) {
-    next(err);
+    return next(err);
   }
 };
 
@@ -137,7 +137,7 @@ export const createPost = async (req: Request, res: Response, next: NextFunction
     });
 
     // Clear cache
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const keys = await redisClient.keys('posts:*');
       if (keys.length > 0) {
         await redisClient.del(keys);
@@ -189,7 +189,7 @@ export const updatePost = async (req: Request, res: Response, next: NextFunction
     await post.save();
 
     // Clear cache
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const keys = await redisClient.keys('posts:*');
       await redisClient.del(`post:${post.slug}`);
       if (keys.length > 0) {
@@ -217,7 +217,7 @@ export const deletePost = async (req: Request, res: Response, next: NextFunction
     }
 
     // Clear cache
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const keys = await redisClient.keys('posts:*');
       await redisClient.del(`post:${post.slug}`);
       if (keys.length > 0) {

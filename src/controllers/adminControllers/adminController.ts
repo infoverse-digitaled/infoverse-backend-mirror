@@ -2,14 +2,13 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import redisClient from '../../config/redis';
 import User from '../../models/User';
-import Course from '../../models/Course';
 import LicenseBatch, { generateLicenseKey } from '../../models/LicenseBatch';
 import { HttpError } from '../../utils/httpError';
 import { successResponse } from '../../middleware/response';
 
 export const getAllUsers = async (_req: Request, res: Response) => {
   try {
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedUsers = await redisClient.get('users');
       if (cachedUsers) {
         const parsedCache = JSON.parse(cachedUsers);
@@ -18,10 +17,10 @@ export const getAllUsers = async (_req: Request, res: Response) => {
     }
 
     const users = await User.find();
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.setEx('users', 3600, JSON.stringify({ data: users }));
     }
-    successResponse(res, users, 'Users retrieved successfully');
+    return successResponse(res, users, 'Users retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -30,7 +29,7 @@ export const getAllUsers = async (_req: Request, res: Response) => {
 
 export const getUserById = async (req: Request, res: Response) => {
   try {
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       const cachedUser = await redisClient.get(`user:${req.params.id}`);
       if (cachedUser) {
         const parsedCache = JSON.parse(cachedUser);
@@ -41,10 +40,10 @@ export const getUserById = async (req: Request, res: Response) => {
     if (!user) {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.setEx(`user:${req.params.id}`, 3600, JSON.stringify({ data: user }));
     }
-    successResponse(res, user, 'User retrieved successfully');
+    return successResponse(res, user, 'User retrieved successfully');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(500, 'Internal server error', 'INTERNAL_SERVER_ERROR');
@@ -102,7 +101,7 @@ export const updateUser = async (req: Request, res: Response) => {
       throw new HttpError(404, 'User not found', 'NOT_FOUND');
     }
 
-    if ((redisClient as any).status === 'ready') {
+    if (redisClient.isReady) {
       await redisClient.del(`user:${req.params.id}`);
       await redisClient.del('users');
     }
@@ -136,16 +135,19 @@ export const createLicenseBatch = async (req: Request, res: Response) => {
     }
 
     const parsedExpiryDate = new Date(expiryDate);
-    if (isNaN(parsedExpiryDate.getTime()) || parsedExpiryDate <= new Date()) {
+    if (Number.isNaN(parsedExpiryDate.getTime()) || parsedExpiryDate <= new Date()) {
       throw new HttpError(400, 'INVALID_EXPIRY_DATE', 'expiryDate must be a valid future date.');
     }
 
-    // Generate a unique license key
+    // Generate a unique license key. Sequential DB checks are required here -
+    // each candidate can only be validated after the previous one is known
+    // to collide, so this can't be parallelized.
     let licenseKey = generateLicenseKey();
     let attempts = 0;
+    // eslint-disable-next-line no-await-in-loop
     while ((await LicenseBatch.findOne({ licenseKey })) && attempts < 10) {
       licenseKey = generateLicenseKey();
-      attempts++;
+      attempts += 1;
     }
 
     if (attempts >= 10) {
@@ -234,7 +236,7 @@ export const updateLicense = async (req: Request, res: Response) => {
 
     if (expiryDate) {
       const parsedDate = new Date(expiryDate);
-      if (isNaN(parsedDate.getTime())) {
+      if (Number.isNaN(parsedDate.getTime())) {
         throw new HttpError(400, 'INVALID_EXPIRY_DATE', 'expiryDate must be a valid date.');
       }
       updateData.expiryDate = parsedDate;

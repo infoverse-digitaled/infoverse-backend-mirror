@@ -6,9 +6,7 @@ import { PAYSTACK_PLANS, getActivePlanCodes, PaystackPlan } from '../config/pays
 import { successResponse } from '../middleware/response';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import config from '../config';
-
-const getErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error ? error.message : fallback;
+import { getErrorMessage } from '../utils/errors';
 
 /**
  * Whether a client-supplied Paystack callback URL may be used.
