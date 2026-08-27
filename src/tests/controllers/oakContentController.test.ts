@@ -22,9 +22,11 @@ jest.mock('../../services/oakApiService', () => ({
   },
 }));
 
-// Mock config with PAID_SUBJECTS
+// Mock config with PAID_SUBJECTS, plus the allow/block lists getSubjects filters on
 jest.mock('../../config/curriculum', () => ({
   PAID_SUBJECTS: ['german', 'french'],
+  ALLOWED_SUBJECTS: { ks1: ['maths', 'german'] },
+  BLOCKED_SUBJECTS: [],
 }));
 
 describe('OakContentController', () => {
@@ -118,7 +120,10 @@ describe('OakContentController', () => {
   });
 
   describe('getLessons', () => {
-    it('should limit lessons to 1 for free user on free subject', async () => {
+    // NOTE: during the 14-day free trial all users get full lesson access,
+    // so getLessons no longer limits count or blocks by subject (see
+    // controller comment) - it only varies the showAds meta flag.
+    it('should return all lessons for a free user, with ads', async () => {
       req.params = { unitSlug: 'unit1' };
       const mockData = [
         { slug: 'lesson1', title: 'Lesson 1', subjectSlug: 'maths' },
@@ -131,14 +136,35 @@ describe('OakContentController', () => {
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: 'Lessons retrieved successfully',
-        data: [{ slug: 'lesson1', title: 'Lesson 1', subjectSlug: 'maths' }], // Only 1 lesson
+        data: mockData,
         meta: { showAds: true },
       });
     });
 
-    it('should return all lessons for premium user', async () => {
+    it('should lock lessons on paid subjects for a free user', async () => {
       req.params = { unitSlug: 'unit1' };
-      req.user = { subscription: { plan: 'premium' } };
+      const mockData = [
+        { slug: 'lesson1', title: 'Lesson 1', subjectSlug: 'maths' },
+        { slug: 'lesson2', title: 'Lesson 2', subjectSlug: 'german' }, // Paid subject
+      ];
+      (oakApiService.getLessons as jest.Mock).mockResolvedValue(mockData);
+
+      await getLessons(req as Request, res as Response, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Lessons retrieved successfully',
+        data: [
+          { slug: 'lesson1', title: 'Lesson 1', subjectSlug: 'maths' },
+          { slug: 'lesson2', title: 'Lesson 2', subjectSlug: 'german', locked: true },
+        ],
+        meta: { showAds: true },
+      });
+    });
+
+    it('should return all lessons for premium user, without ads', async () => {
+      req.params = { unitSlug: 'unit1' };
+      req.user = { subscription: { plan: 'premium', status: 'active' } };
       const mockData = [
         { slug: 'lesson1', title: 'Lesson 1', subjectSlug: 'maths' },
         { slug: 'lesson2', title: 'Lesson 2', subjectSlug: 'maths' },
@@ -153,16 +179,6 @@ describe('OakContentController', () => {
         data: mockData, // All lessons
         meta: { showAds: false },
       });
-    });
-
-    it('should block paid subjects for free user', async () => {
-      req.params = { unitSlug: 'unit1' };
-      const mockData = [{ slug: 'lesson1', title: 'Lesson 1', subjectSlug: 'german' }];
-      (oakApiService.getLessons as jest.Mock).mockResolvedValue(mockData);
-
-      await getLessons(req as Request, res as Response, next);
-
-      expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
     });
   });
 

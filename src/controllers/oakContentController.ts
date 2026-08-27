@@ -107,7 +107,14 @@ export const getUnitDetails = async (req: Request, res: Response, next: NextFunc
 export const getLessons = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { unitSlug } = req.params;
-    const lessons = await oakApiService.getLessons(unitSlug);
+    let lessons: any[] = await oakApiService.getLessons(unitSlug);
+
+    // Lock lessons on paid subjects for free users, mirroring getSubjects.
+    if (isFreeUser(req as AuthenticatedRequest)) {
+      lessons = lessons.map((lesson) =>
+        PAID_SUBJECTS.includes(lesson.subjectSlug) ? { ...lesson, locked: true } : lesson
+      );
+    }
 
     successResponse(res, lessons, 'Lessons retrieved successfully', 200, getMeta(req as AuthenticatedRequest));
   } catch (error) {
