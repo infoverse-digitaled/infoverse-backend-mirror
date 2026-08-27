@@ -10,6 +10,10 @@ jest.mock('../../config', () => {
       apiKey: 'mock-key',
       rateLimit: 100,
     },
+    redis: {
+      url: 'redis://mock:6379',
+      port: 6379,
+    },
   };
   return {
     __esModule: true,
@@ -17,6 +21,19 @@ jest.mock('../../config', () => {
     ...mockConfig,
   };
 });
+
+// The service is exercised via DI with a mock redis client below; prevent the
+// module-level `import redisClient from '../config/redis'` in oakApiService.ts
+// from opening a real connection during tests.
+jest.mock('../../config/redis', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(),
+    setEx: jest.fn(),
+    keys: jest.fn(),
+    del: jest.fn(),
+  },
+}));
 
 // Mock axios.isAxiosError for error handling
 jest.spyOn(axios, 'isAxiosError').mockImplementation((payload: any) => payload?.isAxiosError === true);
@@ -210,7 +227,7 @@ describe('OakApiService', () => {
 
       // Verify error was logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Cache get error for key oak:keystages:',
+        '[OakAPI Cache] Get error for key oak:keystages:',
         expect.any(Error),
       );
 

@@ -9,6 +9,9 @@ module.exports = {
   // Use ts-jest transform for TypeScript support
   transform: {
     ...tsJestTransformCfg,
+    // @faker-js/faker ships ESM-only .js; let ts-jest transpile it too
+    // (transformIgnorePatterns below allows it through node_modules).
+    "^.+\\.jsx?$": ["ts-jest", { isolatedModules: true }],
   },
   // --- New additions for end-to-end testing ---
   // Where Jest should look for test files
