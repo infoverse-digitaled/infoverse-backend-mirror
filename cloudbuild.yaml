@@ -17,13 +17,13 @@ steps:
       # doesn't provision, so they'd fail here regardless of code correctness:
       #  - factories.test.ts: spins up mongodb-memory-server, which downloads
       #    a ~590MB binary on a cold cache.
-      #  - tests/app.test.ts, course.test.ts: boot the full Express app
-      #    (real Mongo connection, JWT_SECRET/MONGO_URI etc. from .env, which
-      #    only ts-node's `-r dotenv/config` loads - plain `jest` does not).
+      #  - tests/app.test.ts: boots the full Express app (real Mongo
+      #    connection, JWT_SECRET/MONGO_URI etc. from .env, which only
+      #    ts-node's `-r dotenv/config` loads - plain `jest` does not).
       # Covered by `npm run test:all` against a provisioned environment
       # instead. TODO: stand up a real integration-test lane (Mongo service +
       # injected secrets) rather than growing this exclusion list further.
-      - '--testPathIgnorePatterns=integration|factories\.test\.ts|src[\\/]tests[\\/]app\.test\.ts|src[\\/]course\.test\.ts'
+      - '--testPathIgnorePatterns=integration|factories\.test\.ts|src[\\/]tests[\\/]app\.test\.ts'
 
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'

@@ -35,47 +35,6 @@ export interface IUser extends Document {
   updatedAt: Date;
 }
 
-// Course Interface
-export interface ICourse extends Document {
-  title: string;
-  description: string;
-  instructorId: IUser['_id'];
-  thumbnailUrl?: string;
-  price: number;
-  source: 'internal' | 'oak';
-  oakMetadata?: {
-    keyStage: 'ks1' | 'ks2' | 'ks3' | 'ks4';
-    subjectSlug: string;
-  };
-  syllabus: {
-    title: string;
-    contentType: 'video' | 'text' | 'quiz';
-    contentUrl: string;
-  }[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Enrollment Interface
-export interface IEnrollment extends Document {
-  userId: IUser['_id'];
-  courseId: ICourse['_id'];
-  enrolledAt: Date;
-  status: 'active' | 'completed' | 'dropped';
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Review Interface
-export interface IReview extends Document {
-  userId: IUser['_id'];
-  courseId: ICourse['_id'];
-  rating: number;
-  comment?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 // Oak Enrollment Interface
 export interface IOakEnrollment extends Document {
   userId: IUser['_id'];
