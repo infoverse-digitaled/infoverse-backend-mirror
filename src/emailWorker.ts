@@ -1,25 +1,31 @@
-import { Worker } from 'bullmq';
+import { Worker, Job } from 'bullmq';
 import { redisConnection } from './utils/emailQueue';
 
-// Generic email sending function
+// TODO(pre-launch): this is a mock - it only logs and never actually sends
+// mail. No mail library (nodemailer etc.) is installed anywhere in this
+// codebase despite config.mail (SMTP host/user/pass) being fully configured.
+// Password reset, enrollment confirmation, and bug-report emails currently
+// never reach a real inbox.
 const sendEmail = async (to: string, subject: string, text: string) => {
   console.log(`WORKER: Sending email to ${to}...`);
   console.log(`WORKER: Subject: ${subject}`);
   console.log(`WORKER: Body: ${text}`);
   // Simulate a network delay for sending the email
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 3000);
+  });
   console.log(`WORKER: Email sent to ${to}!`);
 };
 
 // Specific function for sending a password reset email
-const sendPasswordResetEmail = async (job: any) => {
+const sendPasswordResetEmail = async (job: Job) => {
   const { email, name, subject, text } = job.data;
   console.log(`WORKER: Processing password reset for ${name} at ${email}`);
   await sendEmail(email, subject, text);
 };
 
 // Specific function for sending a bug report notification email
-const sendBugReportEmail = async (job: any) => {
+const sendBugReportEmail = async (job: Job) => {
   const { type, message, rating, email, userId, page } = job.data;
   const subject = `[Bug Report] New ${type} report received`;
   const text = `A new ${type} report has been submitted.
@@ -38,7 +44,7 @@ Submitted via Infoverse Bug Report System`;
 };
 
 // Specific function for sending an enrollment confirmation email
-const sendEnrollmentConfirmationEmail = async (job: any) => {
+const sendEnrollmentConfirmationEmail = async (job: Job) => {
   const { email, name, courseTitle } = job.data;
   const subject = `Confirmation of enrollment in ${courseTitle}`;
   const text = `Hi ${name},
@@ -55,7 +61,7 @@ The Infoverse Team`;
 
 console.log('Email worker process started. Waiting for jobs...');
 
-new Worker(
+const worker = new Worker(
   'email-sending',
   async (job) => {
     console.log(`WORKER: Processing job ${job.id} with name ${job.name}`);
@@ -75,3 +81,7 @@ new Worker(
   },
   { connection: redisConnection },
 );
+
+worker.on('failed', (job, err) => {
+  console.error(`WORKER: Job ${job?.id} (${job?.name}) failed:`, err);
+});

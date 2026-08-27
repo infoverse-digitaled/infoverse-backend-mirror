@@ -1,13 +1,5 @@
 import { Router } from 'express';
-import {
-  getPosts,
-  getPostBySlug,
-  createPost,
-  updatePost,
-  deletePost,
-} from '../controllers/contentController';
-import { authenticateJWT } from '../middleware/authMiddleware';
-import { isAdmin } from '../middleware/roles/isAdmin';
+import { getPosts, getPostBySlug } from '../controllers/contentController';
 
 const router = Router();
 

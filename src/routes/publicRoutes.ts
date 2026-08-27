@@ -65,13 +65,18 @@ router.post('/subscribe', async (req: Request, res: Response) => {
     }
 
     const subscriber = await Subscriber.create({ email: email.toLowerCase() });
-    successResponse(res, { email: subscriber.email }, 'Successfully subscribed to newsletter', 201);
-  } catch (error: any) {
-    if (error.code === 11000) {
+    return successResponse(
+      res,
+      { email: subscriber.email },
+      'Successfully subscribed to newsletter',
+      201,
+    );
+  } catch (error) {
+    if (error instanceof Error && (error as Error & { code?: number }).code === 11000) {
       return res.status(400).json({ error: 'This email is already subscribed' });
     }
     console.error('Subscribe Error:', error);
-    res.status(500).json({ error: 'Failed to subscribe. Please try again.' });
+    return res.status(500).json({ error: 'Failed to subscribe. Please try again.' });
   }
 });
 
@@ -129,15 +134,15 @@ router.post('/contact', async (req: Request, res: Response) => {
     // TODO: Send email notification to support@infoversedigitaleducation.net
     // This would use a service like SendGrid, Mailgun, or AWS SES
 
-    successResponse(
+    return successResponse(
       res,
       { id: contactMessage._id },
       'Your message has been sent successfully. We will get back to you soon!',
       201,
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('Contact Error:', error);
-    res.status(500).json({ error: 'Failed to send message. Please try again.' });
+    return res.status(500).json({ error: 'Failed to send message. Please try again.' });
   }
 });
 
@@ -229,10 +234,10 @@ router.post('/bug-report', bugReportLimiter, async (req: Request, res: Response)
       page,
     });
 
-    successResponse(res, { id: report._id }, 'Bug report submitted successfully', 201);
-  } catch (error: any) {
+    return successResponse(res, { id: report._id }, 'Bug report submitted successfully', 201);
+  } catch (error) {
     console.error('Bug Report Error:', error);
-    res.status(500).json({ error: 'Failed to submit bug report. Please try again.' });
+    return res.status(500).json({ error: 'Failed to submit bug report. Please try again.' });
   }
 });
 

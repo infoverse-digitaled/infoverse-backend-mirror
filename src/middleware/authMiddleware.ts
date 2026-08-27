@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { Request, RequestHandler } from 'express';
 import { jwtVerify } from 'jose';
 import config from '../config';
 import User from '../models/User';
@@ -27,7 +27,7 @@ export const authenticateJWT: RequestHandler = async (req, res, next) => {
   let token: string | undefined;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.split(' ')[1];
+    [, token] = authHeader.split(' ');
   } else if (queryToken) {
     token = queryToken;
   }
@@ -73,7 +73,7 @@ export const authenticateJWT: RequestHandler = async (req, res, next) => {
         : undefined,
     };
     next();
-  } catch (err) {
+  } catch {
     res.status(401).json({
       error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token. Please log in again.' },
     });
@@ -183,7 +183,7 @@ export const optionalAuth: RequestHandler = async (req, res, next) => {
       };
     }
     next();
-  } catch (err) {
+  } catch {
     // If token is invalid, just proceed as unauthenticated
     next();
   }

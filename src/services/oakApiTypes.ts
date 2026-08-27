@@ -53,6 +53,44 @@ export interface Lesson {
 }
 
 /**
+ * Represents a video resource
+ */
+export interface Video {
+  title: string;
+  videoMuxPlaybackId?: string;
+  signedVideoMuxPlaybackId?: string;
+  signedVideoDuration?: number;
+  videoThumbUrl?: string;
+  duration?: number;
+}
+
+/**
+ * @deprecated Use QuizQuestion instead
+ */
+export interface Quiz {
+  question: string;
+  answers: { answer: string; correct: boolean }[];
+  hint?: string;
+}
+
+/**
+ * Represents a transcript sentence for video captions
+ */
+export interface TranscriptSentence {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/**
+ * Represents a keyword definition
+ */
+export interface Keyword {
+  term: string;
+  definition: string;
+}
+
+/**
  * Represents detailed lesson information
  */
 export interface LessonDetails extends Lesson {
@@ -65,18 +103,6 @@ export interface LessonDetails extends Lesson {
   keywords?: Keyword[];
   equipment?: string[];
   contentGuidance?: string[];
-}
-
-/**
- * Represents a video resource
- */
-export interface Video {
-  title: string;
-  videoMuxPlaybackId?: string;
-  signedVideoMuxPlaybackId?: string;
-  signedVideoDuration?: number;
-  videoThumbUrl?: string;
-  duration?: number;
 }
 
 /**
@@ -106,32 +132,6 @@ export interface QuizQuestion {
 export interface LessonQuiz {
   starterQuiz: QuizQuestion[];
   exitQuiz: QuizQuestion[];
-}
-
-/**
- * @deprecated Use QuizQuestion instead
- */
-export interface Quiz {
-  question: string;
-  answers: { answer: string; correct: boolean }[];
-  hint?: string;
-}
-
-/**
- * Represents a transcript sentence for video captions
- */
-export interface TranscriptSentence {
-  start: number;
-  end: number;
-  text: string;
-}
-
-/**
- * Represents a keyword definition
- */
-export interface Keyword {
-  term: string;
-  definition: string;
 }
 
 /**
