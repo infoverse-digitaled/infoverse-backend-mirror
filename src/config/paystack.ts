@@ -28,7 +28,15 @@ const PLAN_CODES = {
 
 // Get the correct plan codes based on current mode
 const currentMode = config.paystack.mode;
-const activePlanCodes = (PLAN_CODES as any)[currentMode];
+const activePlanCodes = PLAN_CODES[currentMode as 'test' | 'live'];
+
+export interface PaystackPlan {
+  code: string | undefined;
+  amount: number;
+  type: 'plan' | 'one-time';
+  studentLimit?: number;
+  interval?: string;
+}
 
 export const PAYSTACK_PLANS = {
   INDIVIDUAL_DAILY: {
@@ -105,7 +113,7 @@ export const PAYSTACK_PLANS = {
     studentLimit: 1000,
     type: 'plan',
   },
-};
+} satisfies Record<string, PaystackPlan>;
 
 // Export plan codes for API endpoint
 export const getActivePlanCodes = () => ({
