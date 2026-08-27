@@ -1,4 +1,22 @@
 steps:
+  # Step 0: Install deps and gate the deploy on lint + unit tests
+  - name: 'node:20'
+    entrypoint: npm
+    args: ['ci']
+
+  - name: 'node:20'
+    entrypoint: npm
+    args: ['run', 'lint']
+
+  - name: 'node:20'
+    entrypoint: npx
+    args:
+      - 'jest'
+      # factories.test.ts is excluded here: it spins up mongodb-memory-server,
+      # which downloads a ~590MB binary on a cold cache and is too slow/flaky
+      # to gate a deploy on. Covered by test:all locally instead.
+      - '--testPathIgnorePatterns=integration|factories\.test\.ts'
+
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', '$_DEPLOY_REGION-docker.pkg.dev/$PROJECT_ID/infoverse/backend:$COMMIT_SHA', '.']
