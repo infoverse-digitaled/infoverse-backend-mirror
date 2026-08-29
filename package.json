@@ -12,6 +12,7 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "worker": "ts-node -r dotenv/config src/emailWorker.ts",
+    "seed:game-questions": "ts-node -r dotenv/config src/scripts/seedGameQuestions.ts",
     "test": "jest --testPathIgnorePatterns=integration",
     "test:integration": "jest --testPathPatterns=integration --runInBand",
     "test:all": "jest --runInBand"
