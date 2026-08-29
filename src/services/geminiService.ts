@@ -5,7 +5,7 @@ import logger from '../utils/logger';
 // Initialize Gemini client
 let genAI: GoogleGenerativeAI | null = null;
 
-const getGeminiClient = (): GoogleGenerativeAI => {
+export const getGeminiClient = (): GoogleGenerativeAI => {
   if (!genAI) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -24,7 +24,7 @@ const RATE_WINDOW = 60 * 1000; // 1 minute in ms
 /**
  retry Gemini requests with exponential backoff
  */
-const executeWithBackoff = async <T>(
+export const executeWithBackoff = async <T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
   baseDelay: number = 2000,

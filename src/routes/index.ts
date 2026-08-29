@@ -9,6 +9,7 @@ import contentRouter from './contentRoutes';
 import aiRouter from './aiRoutes';
 import publicRouter from './publicRoutes';
 import schoolRouter from './schoolRoutes';
+import gameRouter from './gameRoutes';
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use('/content', contentRouter);
 router.use('/ai', aiRouter);
 router.use('/public', publicRouter);
 router.use('/school', schoolRouter);
+router.use('/game', gameRouter);
 
 export default router;

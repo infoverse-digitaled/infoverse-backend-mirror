@@ -88,3 +88,44 @@ export interface IBlogPost extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Game Question Interface (pooled trivia questions, e.g. for the Millionaire game)
+export interface IGameQuestion extends Document {
+  gameSlug: string;
+  keyStage: 'ks1' | 'ks2' | 'ks3' | 'ks4';
+  subject: string;
+  difficulty: number;
+  question: string;
+  options: [string, string, string, string];
+  correctAnswerIndex: number;
+  explanation?: string;
+  usageCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Game Session Interface (one document per playthrough)
+export interface IGameQuestionAsked {
+  questionId: IGameQuestion['_id'];
+  selectedOptionIndex?: number;
+  isCorrect?: boolean;
+  answeredAt?: Date;
+}
+
+export interface IGameSession extends Document {
+  userId: IUser['_id'];
+  gameSlug: string;
+  keyStage: 'ks1' | 'ks2' | 'ks3' | 'ks4';
+  subject: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  currentStep: number;
+  status: 'in_progress' | 'won' | 'lost' | 'abandoned';
+  questionsAsked: IGameQuestionAsked[];
+  score: number;
+  xpEarned: number;
+  startedAt: Date;
+  completedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  markCompleted(status: 'won' | 'lost' | 'abandoned'): Promise<IGameSession>;
+}
