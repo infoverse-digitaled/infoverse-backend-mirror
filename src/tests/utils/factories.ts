@@ -2,7 +2,9 @@ import { faker } from '@faker-js/faker';
 import User from '../../models/User';
 import OakEnrollment from '../../models/OakEnrollment';
 import Progress from '../../models/Progress';
-import { IUser, IOakEnrollment, IProgress } from '../../models/types';
+import GameQuestion from '../../models/GameQuestion';
+import GameSession from '../../models/GameSession';
+import { IUser, IOakEnrollment, IProgress, IGameQuestion, IGameSession } from '../../models/types';
 
 // Password hash for a test user. The actual password is 'password123'
 const testPasswordHash = '$2b$10$Vp2o5z5X/h.4hW5qS3E5lO9l3Y.Z0gZkXwZ5qS3E5lO9l3Y.Z0gZk';
@@ -93,4 +95,58 @@ export const createTestProgress = async (
   await progress.save();
 
   return { user: finalUser, enrollment: finalEnrollment, progress };
+};
+
+/**
+ * Creates and saves a test GameQuestion to the database.
+ */
+export const createMockGameQuestion = async (
+  overrides: Partial<IGameQuestion> = {},
+): Promise<IGameQuestion> => {
+  const defaultQuestion = {
+    gameSlug: 'millionaire',
+    keyStage: 'ks2',
+    subject: 'mixed',
+    difficulty: 1,
+    question: faker.lorem.sentence(),
+    options: [faker.lorem.word(), faker.lorem.word(), faker.lorem.word(), faker.lorem.word()],
+    correctAnswerIndex: 0,
+    explanation: faker.lorem.sentence(),
+    usageCount: 0,
+    ...overrides,
+  };
+
+  const question = new GameQuestion(defaultQuestion);
+  await question.save();
+  return question;
+};
+
+/**
+ * Creates and saves a test GameSession to the database.
+ * If a user is not provided, a new test user will be created automatically.
+ */
+export const createMockGameSession = async (
+  user?: IUser,
+  overrides: Partial<IGameSession> = {},
+): Promise<{ user: IUser; session: IGameSession }> => {
+  const finalUser = user || (await createTestUser());
+
+  const defaultSession = {
+    userId: finalUser._id,
+    gameSlug: 'millionaire',
+    keyStage: 'ks2',
+    subject: 'mixed',
+    difficulty: 'medium',
+    currentStep: 0,
+    status: 'in_progress',
+    questionsAsked: [],
+    score: 0,
+    xpEarned: 0,
+    ...overrides,
+  };
+
+  const session = new GameSession(defaultSession);
+  await session.save();
+
+  return { user: finalUser, session };
 };
